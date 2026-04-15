@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-// Event Schema (for user's joined events - simplified)
+// Joined Event Schema (for user's joined events)
 const joinedEventSchema = new mongoose.Schema({
     eventId: { type: mongoose.Schema.Types.ObjectId, ref: "Event", required: true },
     eventName: { type: String, required: true },
@@ -8,11 +8,13 @@ const joinedEventSchema = new mongoose.Schema({
     joinedAt: { type: Date, default: Date.now }
 });
 
-// Notification Schema
+// Notification Schema - UPDATED with priority and badge
 const notificationSchema = new mongoose.Schema({
     title: { type: String, required: true },
     message: { type: String, required: true },
-    date: { type: Date, default: Date.now }
+    date: { type: Date, default: Date.now },
+    isPriority: { type: Boolean, default: false },
+    badge: { type: String, enum: ['none', 'live', 'new', 'upcoming'], default: 'none' }
 });
 
 // User Schema
@@ -29,7 +31,7 @@ const userSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// Event Model Schema (Fixed - added participants)
+// Event Model Schema
 const eventModelSchema = new mongoose.Schema({
     name: { type: String, required: true },
     imagelink: { type: String, required: true },
