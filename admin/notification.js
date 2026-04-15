@@ -3,10 +3,19 @@ const router = express.Router();
 const { Notification } = require('../schemas/schema');
 const { adminAuth } = require('../middleware/auth');
 
-// Create new notification (with priority and badge)
+// Create new notification (with priority, badge, and buttons)
 router.post('/create', adminAuth, async (req, res) => {
     try {
-        const { title, message, isPriority, badge } = req.body;
+        const { 
+            title, 
+            message, 
+            isPriority, 
+            badge, 
+            button1Text, 
+            button1Link, 
+            button2Text, 
+            button2Link 
+        } = req.body;
         
         if (!title || !message) {
             return res.status(400).json({ message: "Title and message are required" });
@@ -17,7 +26,11 @@ router.post('/create', adminAuth, async (req, res) => {
             message, 
             date: new Date(),
             isPriority: isPriority || false,
-            badge: badge || 'none'
+            badge: badge || 'none',
+            button1Text: button1Text || '',
+            button1Link: button1Link || '',
+            button2Text: button2Text || '',
+            button2Link: button2Link || ''
         });
         
         await notification.save();

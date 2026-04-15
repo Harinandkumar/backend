@@ -8,13 +8,17 @@ const joinedEventSchema = new mongoose.Schema({
     joinedAt: { type: Date, default: Date.now }
 });
 
-// Notification Schema - UPDATED with priority and badge
+// Notification Schema - UPDATED with priority, badge, and buttons
 const notificationSchema = new mongoose.Schema({
     title: { type: String, required: true },
     message: { type: String, required: true },
     date: { type: Date, default: Date.now },
     isPriority: { type: Boolean, default: false },
-    badge: { type: String, enum: ['none', 'live', 'new', 'upcoming'], default: 'none' }
+    badge: { type: String, enum: ['none', 'live', 'new', 'upcoming'], default: 'none' },
+    button1Text: { type: String, default: '' },
+    button1Link: { type: String, default: '' },
+    button2Text: { type: String, default: '' },
+    button2Link: { type: String, default: '' }
 });
 
 // User Schema
