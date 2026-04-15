@@ -1,103 +1,129 @@
 const express = require("express");
 const app = express();
-const mongoose = require("mongoose");
 const dbconnect = require("./dbconn");
-const { User } = require("./schemas/schema");
-const { Event } = require("./schemas/schema");
-const {Notification} = require('./schemas/schema')
-const {Admin} = require('./schemas/schema')
-const bcrypt = require("bcrypt")
+const { User, Event, Notification, Admin } = require("./schemas/schema");
+const bcrypt = require("bcrypt");
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const nodmailer = require('nodemailer')
 const { sendVerificationEmail } = require('./mailer');
 const { userAuth, adminAuth } = require('./middleware/auth');
 const adminRoutes = require('./admin/events');
+const memberRoutes = require('./admin/member');
 const notificationRoutes = require('./admin/notification');
 require('dotenv').config();
 
+// ========== CONNECT DATABASE ==========
 dbconnect();
 
+// ========== MIDDLEWARE ==========
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// CORS - Allow multiple origins
+const allowedOrigins = [
+    'https://c3community.netlify.app',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500'
+];
+
 app.use(cors({
-    origin: '*',
+    origin: function(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Handle preflight requests
 app.options('*', cors());
 
-app.post("/",(req,res)=>{
-    res.send("test api endpoint executed");
-})
+// ========== ENV VALIDATION ==========
+if (!process.env.JWT_SECRET || !process.env.ADMIN_JWT_SECRET) {
+    console.error('FATAL: JWT secrets missing in .env');
+    process.exit(1);
+}
 
-app.get("/",(req,res)=>{
-    res.send("test api endpoint executed");
-})
+// ========== PUBLIC ROUTES ==========
+app.get("/", (req, res) => {
+    res.json({ message: "C3 Community API is running", status: "active" });
+});
 
-
-app.get("/events", async (req, res) => {
+// Get all events (public)
+app.get("/allevents", async (req, res) => {
     try {
-        const events = await Event.find({ isOpen: true })
-            .sort({ date: 1 }) 
-            .limit(3); 
-        
-        res.status(200).json({
-            message: "Events fetched successfully",
-            events
-        });
+        const events = await Event.find({}).sort({ date: -1 });
+        res.status(200).json(events);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
     }
 });
 
-app.listen(3000,()=>{
-    console.log("app is running on server 3000");
-})
+// Get latest 3 open events
+app.get("/events", async (req, res) => {
+    try {
+        const events = await Event.find({ isOpen: true })
+            .sort({ date: 1 })
+            .limit(3);
+        res.status(200).json({ message: "Events fetched successfully", events });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 
+// Get all notifications (public)
+app.get("/api/notifications", async (req, res) => {
+    try {
+        const notifications = await Notification.find().sort({ date: -1 }).limit(50);
+        res.status(200).json(notifications);
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// ========== AUTH ROUTES ==========
 app.post("/signup", async (req, res) => {
     const { name, email, password, branch, batch, regno, mobileno } = req.body;
-   
+
+    // Validation
+    if (!name || !email || !password || !branch || !batch || !regno || !mobileno) {
+        return res.status(400).json({ message: "All fields are required" });
+    }
+
     try {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).json({ message: "Email already in use" });
+        const existingUser = await User.findOne({ $or: [{ email }, { regno }, { mobileno }] });
+        if (existingUser) {
+            if (existingUser.email === email) return res.status(400).json({ message: "Email already in use" });
+            if (existingUser.regno === regno) return res.status(400).json({ message: "Registration number already exists" });
+            if (existingUser.mobileno === mobileno) return res.status(400).json({ message: "Mobile number already exists" });
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ 
-            name, 
-            email, 
-            password: hashedPassword, 
-            branch, 
-            batch, 
-            regno, 
-            mobileno,
-            isverified: false
+        const newUser = new User({
+            name, email, password: hashedPassword, branch, batch, regno, mobileno, isverified: false
         });
 
-        // Create verification token
         const verificationToken = jwt.sign(
             { email: newUser.email },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '24h' } // Increased to 24 hours
         );
 
         await newUser.save();
-        
-        // Send verification email
-        sendVerificationEmail(email, verificationToken);
+        await sendVerificationEmail(email, verificationToken);
 
-        res.status(201).json({ 
-            message: "User registered successfully. Please check your email to verify your account." 
+        res.status(201).json({
+            message: "User registered successfully. Please check your email to verify your account."
         });
-
     } catch (error) {
-        console.log(error)
-        res.status(500).json({ message: "Server error", error });
+        console.log(error);
+        res.status(500).json({ message: "Server error" });
     }
 });
 
@@ -111,42 +137,40 @@ app.post("/login", async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-        // Check if user is verified
         if (!user.isverified) {
-            // Create new verification token
             const verificationToken = jwt.sign(
                 { email: user.email },
                 process.env.JWT_SECRET,
-                { expiresIn: '1h' }
+                { expiresIn: '24h' }
             );
-
-            // Resend verification email
-            sendVerificationEmail(email, verificationToken);
-
-            return res.status(401).json({ 
-                message: "Account not verified. A new verification email has been sent." 
+            await sendVerificationEmail(email, verificationToken);
+            return res.status(401).json({
+                message: "Account not verified. A new verification email has been sent."
             });
         }
 
-        // If user is verified, generate login token
         const token = jwt.sign(
-            { userId: user._id, email: user.email },
+            { userId: user._id, email: user.email, name: user.name },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '7d' } // Extended to 7 days
         );
 
         const events = await Event.find({});
 
-        res.status(200).json({ 
-            message: "Login successful", 
+        res.status(200).json({
+            message: "Login successful",
             token,
             user: {
+                id: user._id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                branch: user.branch,
+                batch: user.batch,
+                regno: user.regno,
+                mobileno: user.mobileno
             },
-            events 
+            events
         });
-
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
@@ -163,21 +187,17 @@ app.post("/admin-login", async (req, res) => {
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-       
         const token = jwt.sign(
             { adminId: admin._id, email: admin.email },
             process.env.ADMIN_JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '7d' }
         );
 
-        res.status(200).json({ 
-            message: "Admin login successful", 
+        res.status(200).json({
+            message: "Admin login successful",
             token,
-            admin: {
-                email: admin.email
-            }
+            admin: { id: admin._id, email: admin.email }
         });
-
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
@@ -191,25 +211,19 @@ app.post("/verify-email", async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findOne({ email: decoded.email });
 
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        if (user.isverified) {
-            return res.status(400).json({ message: "Email already verified" });
-        }
+        if (!user) return res.status(404).json({ message: "User not found" });
+        if (user.isverified) return res.status(400).json({ message: "Email already verified" });
 
         user.isverified = true;
         await user.save();
 
-        res.status(200).json({ message: "Email verified successfully" });
+        res.status(200).json({ message: "Email verified successfully! You can now login." });
     } catch (error) {
         console.error(error);
         res.status(400).json({ message: "Invalid or expired token" });
     }
 });
 
-// Check verification status
 app.get('/check-verification', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -220,35 +234,29 @@ app.get('/check-verification', async (req, res) => {
 
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        res.status(200).json({ isVerified: user.isverified });
-    } catch ( error) {
+        res.status(200).json({ isVerified: user.isverified, user: { name: user.name, email: user.email } });
+    } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-
 app.post('/resend-verification', async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ message: 'Unauthorized' });
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: 'Email required' });
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findOne({ email: decoded.email });
-
+        const user = await User.findOne({ email });
         if (!user) return res.status(404).json({ message: 'User not found' });
-
-        if (user.isverified) {
-            return res.status(400).json({ message: 'User is already verified' });
-        }
+        if (user.isverified) return res.status(400).json({ message: 'User is already verified' });
 
         const verificationToken = jwt.sign(
             { email: user.email },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '24h' }
         );
 
-        sendVerificationEmail(user.email, verificationToken);
+        await sendVerificationEmail(user.email, verificationToken);
         res.status(200).json({ message: 'Verification email sent' });
     } catch (error) {
         console.error(error);
@@ -256,74 +264,22 @@ app.post('/resend-verification', async (req, res) => {
     }
 });
 
-// Example protected user route
-app.get('/protected-user-route', userAuth, (req, res) => {
-    res.json({ message: 'Access granted to user', user: req.user });
-});
-
-// Example protected admin route
-app.get('/protected-admin-route', adminAuth, (req, res) => {
-    res.json({ message: 'Access granted to admin', admin: req.admin });
-});
-
-// Add this after your other middleware
-app.use('/admin', adminRoutes);
-
-// Add notification routes
-app.use('/admin/notifications', notificationRoutes);
-
-// Add this endpoint to verify admin token
-app.get('/admin/verify', async (req, res) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-        return res.status(401).json({ message: 'No token provided' });
-    }
-
+// ========== PROTECTED USER ROUTES ==========
+app.get('/api/user/profile', userAuth, async (req, res) => {
     try {
-        // Verify the token using the admin secret
-        const decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET);
-        
-        // Check if admin still exists in database
-        const admin = await Admin.findOne({ email: decoded.email });
-        if (!admin) {
-            return res.status(401).json({ message: 'Admin not found' });
-        }
-
-        // Return success response
-        res.status(200).json({ 
-            message: 'Token is valid',
-            admin: {
-                email: admin.email
-            }
-        });
-    } catch (error) {
-        console.error('Token verification error:', error);
-        res.status(401).json({ message: 'Invalid or expired token' });
-    }
-});
-
-// Get a specific event by ID
-app.get("/api/events/:id", userAuth, async (req, res) => {
-    try {
-        const event = await Event.findById(req.params.id);
-        if (!event) {
-            return res.status(404).json({ message: "Event not found" });
-        }
-        res.status(200).json(event);
+        const user = await User.findById(req.user.userId).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.status(200).json(user);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Get user's joined events
-app.get("/api/user/events", userAuth, async (req, res) => {
+app.get('/api/user/events', userAuth, async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
+        const user = await User.findById(req.user.userId).populate('events.eventId');
+        if (!user) return res.status(404).json({ message: "User not found" });
         res.status(200).json(user.events);
     } catch (error) {
         console.error(error);
@@ -331,41 +287,36 @@ app.get("/api/user/events", userAuth, async (req, res) => {
     }
 });
 
-// Join an event
+app.get("/api/events/:id", userAuth, async (req, res) => {
+    try {
+        const event = await Event.findById(req.params.id).populate('participants', 'name email');
+        if (!event) return res.status(404).json({ message: "Event not found" });
+        res.status(200).json(event);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 app.post("/api/events/:id/join", userAuth, async (req, res) => {
     try {
         const event = await Event.findById(req.params.id);
-        if (!event) {
-            return res.status(404).json({ message: "Event not found" });
-        }
+        if (!event) return res.status(404).json({ message: "Event not found" });
+        if (!event.isOpen) return res.status(400).json({ message: "Event registration is closed" });
 
         const user = await User.findById(req.user.userId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
+        if (!user) return res.status(404).json({ message: "User not found" });
 
-        // Check if user already joined this event
         const alreadyJoined = user.events.some(e => e.eventId.toString() === event._id.toString());
-        if (alreadyJoined) {
-            return res.status(400).json({ message: "You have already joined this event" });
-        }
+        if (alreadyJoined) return res.status(400).json({ message: "You have already joined this event" });
 
         // Add event to user's events
         user.events.push({
             eventId: event._id,
             eventName: event.name,
             eventImage: event.imagelink,
-            date: event.date,
-            isOpen: event.isOpen,
-            isResultAnnounced: event.isResultAnnounced,
-            winners: event.winners,
-            participants: event.participants
+            joinedAt: new Date()
         });
-
-        // Initialize participants array if it doesn't exist
-        if (!event.participants) {
-            event.participants = [];
-        }
 
         // Add user to event's participants
         if (!event.participants.includes(user._id)) {
@@ -374,8 +325,8 @@ app.post("/api/events/:id/join", userAuth, async (req, res) => {
         }
 
         await Promise.all([user.save(), event.save()]);
-        
-        res.status(200).json({ 
+
+        res.status(200).json({
             message: "Event joined successfully",
             event: user.events[user.events.length - 1]
         });
@@ -385,16 +336,10 @@ app.post("/api/events/:id/join", userAuth, async (req, res) => {
     }
 });
 
-// Get event participants
 app.get("/api/events/:id/participants", userAuth, async (req, res) => {
     try {
-        const event = await Event.findById(req.params.id)
-            .populate('participants', 'name email branch batch');
-        
-        if (!event) {
-            return res.status(404).json({ message: "Event not found" });
-        }
-
+        const event = await Event.findById(req.params.id).populate('participants', 'name email branch batch regno');
+        if (!event) return res.status(404).json({ message: "Event not found" });
         res.status(200).json(event.participants);
     } catch (error) {
         console.error(error);
@@ -402,49 +347,29 @@ app.get("/api/events/:id/participants", userAuth, async (req, res) => {
     }
 });
 
-app.get("/allevents",async(req,res)=>{
-    const events = await Event.find({});
-    res.status(200).json(events);
-})
+// ========== ADMIN ROUTES (Mounted) ==========
+app.use('/admin', adminRoutes);
+app.use('/admin/members', memberRoutes);
+app.use('/admin/notifications', notificationRoutes);
 
-// Get all notifications (public endpoint)
-app.get("/api/notifications", async (req, res) => {
+// Admin verify endpoint
+app.get('/admin/verify', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
     try {
-        // Fetch all notifications, sorted by date (newest first)
-        const notifications = await Notification.find()
-            .sort({ date: -1 })
-            .limit(50); // Limit to most recent 50
-        
-        res.status(200).json(notifications);
+        const decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET);
+        const admin = await Admin.findOne({ email: decoded.email }).select('-password');
+        if (!admin) return res.status(401).json({ message: 'Admin not found' });
+        res.status(200).json({ message: 'Token is valid', admin });
     } catch (error) {
-        console.error('Error fetching notifications:', error);
-        res.status(500).json({ message: "Server error" });
+        console.error('Token verification error:', error);
+        res.status(401).json({ message: 'Invalid or expired token' });
     }
 });
 
-// Admin notification creation endpoint directly in index.js as a backup
-app.post("/admin/notifications/create", adminAuth, async (req, res) => {
-    try {
-        const { title, message } = req.body;
-        
-        if (!title || !message) {
-            return res.status(400).json({ message: "Title and message are required" });
-        }
-        
-        const newNotification = new Notification({
-            title,
-            message,
-            date: new Date()
-        });
-        
-        await newNotification.save();
-        
-        res.status(201).json({ 
-            message: "Notification created successfully",
-            notification: newNotification
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
-    }
+// ========== START SERVER ==========
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });

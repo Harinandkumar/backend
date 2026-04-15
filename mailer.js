@@ -9,8 +9,8 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const sendVerificationEmail = (email, token) => {
-    const verificationLink = `${process.env.FRONTEND_URL}/email_verify.html?token=${token}`;
+const sendVerificationEmail = async (email, token) => {
+    const verificationLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/email_verify.html?token=${token}`;
     
     const mailOptions = {
         from: process.env.EMAIL_USER,
@@ -27,19 +27,19 @@ const sendVerificationEmail = (email, token) => {
                 </a>
                 <p>If the button doesn't work, copy and paste this link in your browser:</p>
                 <p>${verificationLink}</p>
+                <p>This link will expire in 24 hours.</p>
             </div>
         `
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            console.error('Error sending email:', error);
-        } else {
-            console.log('Email sent:', info.response);
-        }
-    });
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent:', info.response);
+        return true;
+    } catch (error) {
+        console.error('Error sending email:', error);
+        return false;
+    }
 };
 
-const socket = new WebSocket('ws://localhost:3000');
-
-module.exports = { sendVerificationEmail }; 
+module.exports = { sendVerificationEmail };

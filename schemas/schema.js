@@ -1,55 +1,54 @@
 const mongoose = require("mongoose");
 
-const eventSchema = new mongoose.Schema({
+// Event Schema (for user's joined events - simplified)
+const joinedEventSchema = new mongoose.Schema({
     eventId: { type: mongoose.Schema.Types.ObjectId, ref: "Event", required: true },
     eventName: { type: String, required: true },
-    eventImage: { type: String, required: true },
-    date: { type: Date, required: true },
-    isOpen: { type: Boolean, default: true },
-    isResultAnnounced: { type: Boolean, default: false },
-    winners: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    participants: { type: [mongoose.Schema.Types.ObjectId], ref: "User", default: [] },
-    participantsCount: { type: Number, default: 0 }
+    eventImage: { type: String },
+    joinedAt: { type: Date, default: Date.now }
 });
 
+// Notification Schema
 const notificationSchema = new mongoose.Schema({
-    title:{type:String,required:true},
+    title: { type: String, required: true },
     message: { type: String, required: true },
-    date: { type: Date, default: Date.now },
-   
+    date: { type: Date, default: Date.now }
 });
 
+// User Schema
 const userSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, auto: true }, 
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     branch: { type: String, required: true },
     batch: { type: String, enum: ["22-26", "23-27", "24-28"], required: true },
-    regno: { type: Number, required: true, unique: true },
-    mobileno: { type: Number, required: true, unique: true },
-    isverified:{type: Boolean, default: false},
-    events: [eventSchema],
-    notifications: [notificationSchema]
+    regno: { type: String, required: true, unique: true },
+    mobileno: { type: String, required: true, unique: true },
+    isverified: { type: Boolean, default: false },
+    events: [joinedEventSchema],
+    createdAt: { type: Date, default: Date.now }
 });
 
-    const eventModelSchema = new mongoose.Schema({
+// Event Model Schema (Fixed - added participants)
+const eventModelSchema = new mongoose.Schema({
     name: { type: String, required: true },
     imagelink: { type: String, required: true },
     date: { type: Date, required: true },
-    pdflink:{type:String,required:true},
+    pdflink: { type: String, required: true },
     isOpen: { type: Boolean, default: true },
     isResultAnnounced: { type: Boolean, default: false },
     winners: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    prize:{type:String , required:true},
-    location:{type:String,required:true},
-    description:{type:String,required:true}
-    });
+    prize: { type: String, required: true },
+    location: { type: String, required: true },
+    description: { type: String, required: true },
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    participantsCount: { type: Number, default: 0 }
+});
 
+// Admin Schema
 const adminSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    
+    password: { type: String, required: true }
 });
 
 const User = mongoose.model("User", userSchema);
