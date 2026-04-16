@@ -11,6 +11,7 @@ const adminRoutes = require('./admin/events');
 const memberRoutes = require('./admin/member');
 const notificationRoutes = require('./admin/notification');
 const navRoutes = require('./admin/nav');  // ✅ ADD THIS LINE
+const galleryRoutes = require('./admin/gallery');
 require('dotenv').config();
 
 // ========== CORS ==========
@@ -285,6 +286,8 @@ app.use('/admin/members', memberRoutes);
 app.use('/admin/notifications', notificationRoutes);
 app.use('/admin', navRoutes);  // ✅ ADD THIS LINE
 app.use('/api', navRoutes);     // ✅ ADD THIS LINE (for public route)
+app.use('/admin', galleryRoutes);
+app.use('/api', galleryRoutes);
 
 // Admin verify endpoint
 app.get('/admin/verify', async (req, res) => {

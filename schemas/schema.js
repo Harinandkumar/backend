@@ -32,7 +32,10 @@ const userSchema = new mongoose.Schema({
     mobileno: { type: String, required: true, unique: true },
     isverified: { type: Boolean, default: false },
     events: [joinedEventSchema],
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+     // ✅ NEW: Forgot password fields
+    resetPasswordToken: { type: String, default: '' },
+    resetPasswordExpires: { type: Date, default: null }
 });
 
 // Event Model Schema
