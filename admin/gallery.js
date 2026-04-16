@@ -4,30 +4,26 @@ const Gallery = require('../schemas/gallery');
 const { adminAuth } = require('../middleware/auth');
 const { cloudinary, upload } = require('../config/cloudinary');
 
-// ========== ADMIN ROUTES ==========
-
-// Upload image to Cloudinary
+// Upload image with category
 router.post('/gallery/upload', adminAuth, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
-        
+
         const galleryImage = new Gallery({
             title: req.body.title || 'Untitled',
             cloudinaryUrl: req.file.path,
             publicId: req.file.filename,
+            category: req.body.category || 'events',
             format: req.file.format,
             size: req.file.size,
             width: req.file.width,
             height: req.file.height
         });
-        
+
         await galleryImage.save();
-        res.status(201).json({ 
-            message: 'Image uploaded successfully', 
-            image: galleryImage 
-        });
+        res.status(201).json({ message: 'Image uploaded successfully', image: galleryImage });
     } catch (error) {
         console.error('Upload error:', error);
         res.status(400).json({ message: error.message });
@@ -57,38 +53,38 @@ router.get('/gallery/:id', adminAuth, async (req, res) => {
     }
 });
 
-// Update image title
+// Update image (title and category)
 router.put('/gallery/:id', adminAuth, async (req, res) => {
     try {
-        const { title } = req.body;
+        const { title, category } = req.body;
         const image = await Gallery.findByIdAndUpdate(
             req.params.id,
-            { title },
+            { title, category },
             { new: true }
         );
         if (!image) {
             return res.status(404).json({ message: 'Image not found' });
         }
-        res.json({ message: 'Title updated', image });
+        res.json({ message: 'Image updated successfully', image });
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
 });
 
-// Delete image from Cloudinary and database
+// Delete image
 router.delete('/gallery/:id', adminAuth, async (req, res) => {
     try {
         const image = await Gallery.findById(req.params.id);
         if (!image) {
             return res.status(404).json({ message: 'Image not found' });
         }
-        
+
         // Delete from Cloudinary
         await cloudinary.uploader.destroy(image.publicId);
-        
+
         // Delete from database
         await Gallery.findByIdAndDelete(req.params.id);
-        
+
         res.json({ message: 'Image deleted successfully' });
     } catch (error) {
         console.error('Delete error:', error);
@@ -96,9 +92,7 @@ router.delete('/gallery/:id', adminAuth, async (req, res) => {
     }
 });
 
-// ========== PUBLIC ROUTES ==========
-
-// Get all gallery images (for frontend website)
+// Public route - get all gallery images
 router.get('/public/gallery', async (req, res) => {
     try {
         const images = await Gallery.find().sort({ uploadDate: -1 });
