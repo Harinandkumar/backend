@@ -12,6 +12,7 @@ const memberRoutes = require('./admin/member');
 const notificationRoutes = require('./admin/notification');
 const navRoutes = require('./admin/nav');  // ✅ ADD THIS LINE
 const galleryRoutes = require('./admin/gallery');
+const categoryRoutes = require('./admin/category');
 require('dotenv').config();
 
 // ========== CORS ==========
@@ -288,7 +289,8 @@ app.use('/admin', navRoutes);  // ✅ ADD THIS LINE
 app.use('/api', navRoutes);     // ✅ ADD THIS LINE (for public route)
 app.use('/admin', galleryRoutes);
 app.use('/api', galleryRoutes);
-
+app.use('/admin', categoryRoutes);
+app.use('/api', categoryRoutes);
 // Admin verify endpoint
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];

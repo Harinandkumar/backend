@@ -10,7 +10,7 @@ router.post('/gallery/upload', adminAuth, upload.single('image'), async (req, re
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
-
+        
         const galleryImage = new Gallery({
             title: req.body.title || 'Untitled',
             cloudinaryUrl: req.file.path,
@@ -21,7 +21,7 @@ router.post('/gallery/upload', adminAuth, upload.single('image'), async (req, re
             width: req.file.width,
             height: req.file.height
         });
-
+        
         await galleryImage.save();
         res.status(201).json({ message: 'Image uploaded successfully', image: galleryImage });
     } catch (error) {
@@ -44,9 +44,7 @@ router.get('/gallery', adminAuth, async (req, res) => {
 router.get('/gallery/:id', adminAuth, async (req, res) => {
     try {
         const image = await Gallery.findById(req.params.id);
-        if (!image) {
-            return res.status(404).json({ message: 'Image not found' });
-        }
+        if (!image) return res.status(404).json({ message: 'Image not found' });
         res.json(image);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -62,9 +60,7 @@ router.put('/gallery/:id', adminAuth, async (req, res) => {
             { title, category },
             { new: true }
         );
-        if (!image) {
-            return res.status(404).json({ message: 'Image not found' });
-        }
+        if (!image) return res.status(404).json({ message: 'Image not found' });
         res.json({ message: 'Image updated successfully', image });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -75,16 +71,11 @@ router.put('/gallery/:id', adminAuth, async (req, res) => {
 router.delete('/gallery/:id', adminAuth, async (req, res) => {
     try {
         const image = await Gallery.findById(req.params.id);
-        if (!image) {
-            return res.status(404).json({ message: 'Image not found' });
-        }
-
-        // Delete from Cloudinary
+        if (!image) return res.status(404).json({ message: 'Image not found' });
+        
         await cloudinary.uploader.destroy(image.publicId);
-
-        // Delete from database
         await Gallery.findByIdAndDelete(req.params.id);
-
+        
         res.json({ message: 'Image deleted successfully' });
     } catch (error) {
         console.error('Delete error:', error);
