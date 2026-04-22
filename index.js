@@ -5,14 +5,23 @@ const { User, Event, Notification, Admin } = require("./schemas/schema");
 const bcrypt = require("bcrypt");
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const { sendVerificationEmail } = require('./mailer');
+const { sendVerificationEmail, sendNewMemberEmail } = require('./mailer');
 const { userAuth, adminAuth } = require('./middleware/auth');
 const adminRoutes = require('./admin/events');
 const memberRoutes = require('./admin/member');
 const notificationRoutes = require('./admin/notification');
-const navRoutes = require('./admin/nav');  // ✅ ADD THIS LINE
+const navRoutes = require('./admin/nav');
 const galleryRoutes = require('./admin/gallery');
 const categoryRoutes = require('./admin/category');
+
+// ========== NEW TEAM MANAGEMENT ROUTES ==========
+const teamAuthRoutes = require('./admin/team-auth');
+const teamManagementRoutes = require('./admin/team');
+const workRoutes = require('./admin/work');
+
+// ========== SCHEMAS FOR SEEDING ==========
+const TeamMember = require('./schemas/teamMember');
+
 require('dotenv').config();
 
 // ========== CORS ==========
@@ -30,6 +39,49 @@ app.use(express.urlencoded({ extended: true }));
 
 // ========== CONNECT DATABASE ==========
 dbconnect();
+
+// ========== SEED SUPER ADMIN (Run once) ==========
+const seedSuperAdmin = async () => {
+    try {
+        const existingSuperAdmin = await TeamMember.findOne({ role: 'super_admin' });
+        if (!existingSuperAdmin) {
+            const superAdmin = new TeamMember({
+                name: 'Super Admin',
+                email: 'creativecodingcommunity.cs@gmail.com',  // ✅ CORRECT EMAIL
+                position: 'Super Admin',
+                role: 'super_admin',
+                phone: '0000000000',
+                profileImage: '',
+                isActive: true,
+                permissions: {
+                    events: { create: true, edit: true, delete: true },
+                    notifications: { create: true, delete: true },
+                    gallery: { upload: true, delete: true },
+                    members: { view: true, delete: true },
+                    categories: { create: true, edit: true, delete: true },
+                    navItems: { create: true, edit: true, delete: true },
+                    teamManagement: { view: true, edit: true }
+                }
+            });
+            await superAdmin.save();
+            console.log('✅ Super Admin created!');
+            console.log('📧 Email: creativecodingcommunity.cs@gmail.com');
+            console.log('🔐 Use OTP login - no password needed');
+            console.log('🌐 Login URL: https://c3community.netlify.app/admin-team-login.html');
+        } else {
+            console.log('✅ Super Admin already exists');
+            // Update existing super admin email if different
+            const existing = await TeamMember.findOne({ role: 'super_admin' });
+            if (existing && existing.email !== 'creativecodingcommunity.cs@gmail.com') {
+                existing.email = 'creativecodingcommunity.cs@gmail.com';
+                await existing.save();
+                console.log('✅ Super Admin email updated to: creativecodingcommunity.cs@gmail.com');
+            }
+        }
+    } catch (error) {
+        console.error('Seed error:', error);
+    }
+};
 
 // ========== HEALTH CHECK ==========
 app.get("/", (req, res) => {
@@ -67,7 +119,7 @@ app.get("/api/notifications", async (req, res) => {
     }
 });
 
-// ========== AUTH ROUTES ==========
+// ========== AUTH ROUTES (USER) ==========
 app.post("/signup", async (req, res) => {
     const { name, email, password, branch, batch, regno, mobileno } = req.body;
     if (!name || !email || !password || !branch || !batch || !regno || !mobileno) {
@@ -140,6 +192,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
+// ========== OLD ADMIN LOGIN (Keep for backward compatibility) ==========
 app.post("/admin-login", async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -281,17 +334,28 @@ app.get("/api/events/:id/participants", userAuth, async (req, res) => {
     }
 });
 
-// ========== ADMIN ROUTES ==========
+// ========== ADMIN ROUTES (Existing) ==========
 app.use('/admin', adminRoutes);
 app.use('/admin/members', memberRoutes);
 app.use('/admin/notifications', notificationRoutes);
-app.use('/admin', navRoutes);  // ✅ ADD THIS LINE
-app.use('/api', navRoutes);     // ✅ ADD THIS LINE (for public route)
+app.use('/admin', navRoutes);
+app.use('/api', navRoutes);
 app.use('/admin', galleryRoutes);
 app.use('/api', galleryRoutes);
 app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
-// Admin verify endpoint
+
+// ========== NEW TEAM MANAGEMENT ROUTES ==========
+// OTP Login Routes (for all team members including super admin)
+app.use('/api/team', teamAuthRoutes);
+
+// Team Management Routes (Super Admin only)
+app.use('/api/team', teamManagementRoutes);
+
+// Work Assignment Routes
+app.use('/api/work', workRoutes);
+
+// ========== ADMIN VERIFY ENDPOINT (Existing) ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
@@ -308,6 +372,12 @@ app.get('/admin/verify', async (req, res) => {
 
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📧 Email service: ${process.env.EMAIL_USER ? 'Configured' : 'Not configured'}`);
+    
+    // Seed super admin after database connection
+    setTimeout(async () => {
+        await seedSuperAdmin();
+    }, 3000);
 });
