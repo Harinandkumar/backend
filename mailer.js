@@ -1,19 +1,16 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// ========== BREVO SMTP TRANSPORTER (Render compatible) ==========
+// ========== BREVO SMTP TRANSPORTER ==========
 const transporter = nodemailer.createTransport({
     host: process.env.BREVO_HOST || 'smtp-relay.sendinblue.com',
     port: parseInt(process.env.BREVO_PORT) || 587,
-    secure: false,  // false for 587, true for 465
+    secure: false,
     auth: {
         user: process.env.BREVO_USER,
         pass: process.env.BREVO_PASS
     },
-    tls: {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: false
-    },
+    tls: { ciphers: 'SSLv3' },
     connectionTimeout: 30000,
     greetingTimeout: 30000,
     socketTimeout: 30000
@@ -21,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 const FROM_EMAIL = process.env.BREVO_FROM || process.env.BREVO_USER;
 
-// ========== Email Verification (Signup) ==========
+// ========== Email Verification ==========
 const sendVerificationEmail = async (email, token) => {
     const verificationLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/email_verify.html?token=${token}`;
     
@@ -29,25 +26,11 @@ const sendVerificationEmail = async (email, token) => {
         from: FROM_EMAIL,
         to: email,
         subject: 'Verify Your Email - Creative Coding Community',
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #00f0ff;">Welcome to Creative Coding Community!</h2>
-                <p>Please verify your email address to complete your registration.</p>
-                <a href="${verificationLink}" 
-                   style="display: inline-block; padding: 12px 24px; background-color: #00f0ff; 
-                          color: #ffffff; text-decoration: none; border-radius: 4px; margin: 20px 0;">
-                    Verify Now
-                </a>
-                <p>If the button doesn't work, copy and paste this link in your browser:</p>
-                <p>${verificationLink}</p>
-                <p>This link will expire in 24 hours.</p>
-            </div>
-        `
+        html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #00f0ff;">Welcome!</h2><p>Verify your email: <a href="${verificationLink}">Click here</a></p><p>${verificationLink}</p><p>Expires in 24 hours.</p></div>`
     };
 
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('Verification email sent:', info.response);
+        await transporter.sendMail(mailOptions);
         return true;
     } catch (error) {
         console.error('Error sending verification email:', error);
@@ -55,35 +38,18 @@ const sendVerificationEmail = async (email, token) => {
     }
 };
 
-// ========== OTP Email for Team Login (Brevo optimized) ==========
+// ========== OTP Email for Team Login ==========
 const sendOTPEmail = async (email, otp) => {
     const mailOptions = {
         from: FROM_EMAIL,
         to: email,
-        subject: '🔐 Your C3 Admin Login OTP - Creative Coding Community',
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;">
-                <h2 style="text-align: center; color: #00f0ff;">Creative Coding Community</h2>
-                <h3 style="text-align: center;">Admin Portal Login OTP</h3>
-                
-                <div style="text-align: center; padding: 20px; margin: 20px 0;">
-                    <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; background: #f0f0f0; padding: 20px; border-radius: 12px; color: #00f0ff; font-family: monospace;">
-                        ${otp}
-                    </div>
-                </div>
-                
-                <p style="text-align: center;">This OTP is valid for <strong>5 minutes</strong>.</p>
-                <p style="text-align: center; font-size: 12px; color: #666;">If you didn't request this, please ignore this email.</p>
-                
-                <hr style="border-color: #00f0ff;">
-                <p style="text-align: center; font-size: 11px;">C3 Community - GEC Samastipur</p>
-            </div>
-        `
+        subject: '🔐 Your C3 Admin Login OTP',
+        html: `<div style="font-family: Arial; max-width: 500px; margin: auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;"><h2 style="text-align: center; color: #00f0ff;">C3 Community</h2><h3 style="text-align: center;">Login OTP</h3><div style="text-align: center; font-size: 36px; font-weight: bold; letter-spacing: 8px; background: #f0f0f0; padding: 20px; border-radius: 12px;">${otp}</div><p style="text-align: center;">Valid for 5 minutes.</p><hr><p style="text-align: center; font-size: 11px;">C3 Community - GEC Samastipur</p></div>`
     };
 
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('OTP email sent:', info.response);
+        await transporter.sendMail(mailOptions);
+        console.log('OTP email sent to:', email);
         return true;
     } catch (error) {
         console.error('Error sending OTP email:', error);
@@ -94,45 +60,19 @@ const sendOTPEmail = async (email, otp) => {
 // ========== Work Assignment Email ==========
 const sendWorkAssignedEmail = async (email, workDetails) => {
     const { title, description, dueDate, priority, assignedByName } = workDetails;
-    
     const dashboardLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/admin-team-dashboard.html`;
-    
     const priorityColor = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
     const priorityText = priority === 'high' ? '🔴 High' : priority === 'medium' ? '🟡 Medium' : '🟢 Low';
     
     const mailOptions = {
         from: FROM_EMAIL,
         to: email,
-        subject: `📋 New Work Assigned: ${title} - C3 Community`,
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #00f0ff; border-radius: 16px;">
-                <h2 style="text-align: center; color: #00f0ff;">📋 New Task Assigned!</h2>
-                
-                <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
-                    <h3 style="color: #00f0ff;">${title}</h3>
-                    <p>${description}</p>
-                    
-                    <div style="margin-top: 15px; padding: 10px; background: #e0e0e0; border-radius: 8px;">
-                        <p><strong>Priority:</strong> <span style="color: ${priorityColor};">${priorityText}</span></p>
-                        ${dueDate ? `<p><strong>Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>` : ''}
-                        <p><strong>Assigned By:</strong> ${assignedByName}</p>
-                    </div>
-                </div>
-                
-                <div style="text-align: center;">
-                    <a href="${dashboardLink}" 
-                       style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); 
-                              color: white; text-decoration: none; border-radius: 8px;">
-                        View My Tasks
-                    </a>
-                </div>
-            </div>
-        `
+        subject: `📋 New Work: ${title} - C3 Community`,
+        html: `<div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #00f0ff;"><h2 style="color: #00f0ff;">📋 New Task!</h2><div><h3>${title}</h3><p>${description}</p><div><p><strong>Priority:</strong> <span style="color: ${priorityColor};">${priorityText}</span></p>${dueDate ? `<p><strong>Due:</strong> ${new Date(dueDate).toLocaleDateString()}</p>` : ''}<p><strong>By:</strong> ${assignedByName}</p></div></div><div><a href="${dashboardLink}" style="display: inline-block; padding: 12px 30px; background: #00f0ff; color: black; text-decoration: none;">View Task</a></div></div>`
     };
 
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('Work assigned email sent:', info.response);
+        await transporter.sendMail(mailOptions);
         return true;
     } catch (error) {
         console.error('Error sending work assigned email:', error);
@@ -143,41 +83,17 @@ const sendWorkAssignedEmail = async (email, workDetails) => {
 // ========== Work Completed Notification ==========
 const sendWorkCompletedEmail = async (adminEmail, workDetails) => {
     const { title, completedByName, completedByEmail, remarks } = workDetails;
-    
     const adminLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/admin-super-dashboard.html`;
     
     const mailOptions = {
         from: FROM_EMAIL,
         to: adminEmail,
         subject: `✅ Work Completed: ${title} - C3 Community`,
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #10b981; border-radius: 16px;">
-                <h2 style="text-align: center; color: #10b981;">✅ Task Completed!</h2>
-                
-                <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
-                    <h3 style="color: #00f0ff;">${title}</h3>
-                    
-                    <div style="margin-top: 15px; padding: 10px; background: #e0e0e0; border-radius: 8px;">
-                        <p><strong>Completed By:</strong> ${completedByName} (${completedByEmail})</p>
-                        ${remarks ? `<p><strong>Remarks:</strong> ${remarks}</p>` : ''}
-                        <p><strong>Completed At:</strong> ${new Date().toLocaleString()}</p>
-                    </div>
-                </div>
-                
-                <div style="text-align: center;">
-                    <a href="${adminLink}" 
-                       style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); 
-                              color: white; text-decoration: none; border-radius: 8px;">
-                        Go to Admin Dashboard
-                    </a>
-                </div>
-            </div>
-        `
+        html: `<div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #10b981;"><h2 style="color: #10b981;">✅ Task Completed!</h2><div><h3>${title}</h3><div><p><strong>By:</strong> ${completedByName} (${completedByEmail})</p>${remarks ? `<p><strong>Remarks:</strong> ${remarks}</p>` : ''}<p><strong>At:</strong> ${new Date().toLocaleString()}</p></div></div><div><a href="${adminLink}" style="display: inline-block; padding: 12px 30px; background: #00f0ff; color: black; text-decoration: none;">Go to Dashboard</a></div></div>`
     };
 
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('Work completed email sent:', info.response);
+        await transporter.sendMail(mailOptions);
         return true;
     } catch (error) {
         console.error('Error sending work completed email:', error);
@@ -192,34 +108,12 @@ const sendNewMemberEmail = async (email, name, position) => {
     const mailOptions = {
         from: FROM_EMAIL,
         to: email,
-        subject: '🎉 Welcome to C3 Admin Team! - Creative Coding Community',
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;">
-                <h2 style="text-align: center; color: #00f0ff;">Welcome to the Team, ${name}! 🎉</h2>
-                
-                <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
-                    <p>You have been added as a <strong style="color: #00f0ff;">${position}</strong> in the C3 Community Admin Team.</p>
-                    <p>You can now access the admin portal using OTP login.</p>
-                </div>
-                
-                <div style="text-align: center;">
-                    <a href="${loginLink}" 
-                       style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); 
-                              color: white; text-decoration: none; border-radius: 8px;">
-                        Login to Admin Portal
-                    </a>
-                </div>
-                
-                <p style="text-align: center; font-size: 12px; margin-top: 20px;">
-                    Use your email to receive OTP for login. No password needed!
-                </p>
-            </div>
-        `
+        subject: '🎉 Welcome to C3 Admin Team!',
+        html: `<div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px; border: 2px solid #00f0ff;"><h2 style="color: #00f0ff;">Welcome, ${name}! 🎉</h2><div><p>You are added as <strong>${position}</strong> in C3 Admin Team.</p><p>Login with OTP using your email.</p></div><div><a href="${loginLink}" style="display: inline-block; padding: 12px 30px; background: #00f0ff; color: black; text-decoration: none;">Login</a></div></div>`
     };
 
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('New member welcome email sent:', info.response);
+        await transporter.sendMail(mailOptions);
         return true;
     } catch (error) {
         console.error('Error sending welcome email:', error);
