@@ -1,20 +1,32 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+// ========== BREVO SMTP TRANSPORTER (Render compatible) ==========
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.BREVO_HOST || 'smtp-relay.sendinblue.com',
+    port: parseInt(process.env.BREVO_PORT) || 587,
+    secure: false,  // false for 587, true for 465
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
+        user: process.env.BREVO_USER,
+        pass: process.env.BREVO_PASS
+    },
+    tls: {
+        ciphers: 'SSLv3',
+        rejectUnauthorized: false
+    },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000
 });
 
-// ========== EXISTING - Email Verification ==========
+const FROM_EMAIL = process.env.BREVO_FROM || process.env.BREVO_USER;
+
+// ========== Email Verification (Signup) ==========
 const sendVerificationEmail = async (email, token) => {
     const verificationLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/email_verify.html?token=${token}`;
     
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: FROM_EMAIL,
         to: email,
         subject: 'Verify Your Email - Creative Coding Community',
         html: `
@@ -43,16 +55,16 @@ const sendVerificationEmail = async (email, token) => {
     }
 };
 
-// ========== UPDATED - OTP Email for Team Login (SIMPLIFIED - NO EXTERNAL IMAGES) ==========
+// ========== OTP Email for Team Login (Brevo optimized) ==========
 const sendOTPEmail = async (email, otp) => {
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: FROM_EMAIL,
         to: email,
         subject: '🔐 Your C3 Admin Login OTP - Creative Coding Community',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;">
-                <h2 style="text-align: center; color: #00f0ff; margin-top: 0;">Creative Coding Community</h2>
-                <h3 style="text-align: center; color: #333333;">Admin Portal Login OTP</h3>
+                <h2 style="text-align: center; color: #00f0ff;">Creative Coding Community</h2>
+                <h3 style="text-align: center;">Admin Portal Login OTP</h3>
                 
                 <div style="text-align: center; padding: 20px; margin: 20px 0;">
                     <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; background: #f0f0f0; padding: 20px; border-radius: 12px; color: #00f0ff; font-family: monospace;">
@@ -60,12 +72,11 @@ const sendOTPEmail = async (email, otp) => {
                     </div>
                 </div>
                 
-                <p style="text-align: center;">This OTP is valid for <strong style="color: #00f0ff;">5 minutes</strong>.</p>
-                <p style="text-align: center; font-size: 12px; color: #888888;">If you didn't request this, please ignore this email.</p>
+                <p style="text-align: center;">This OTP is valid for <strong>5 minutes</strong>.</p>
+                <p style="text-align: center; font-size: 12px; color: #666;">If you didn't request this, please ignore this email.</p>
                 
-                <hr style="border-color: #00f0ff; margin: 20px 0;">
-                
-                <p style="text-align: center; font-size: 11px; color: #888888;">C3 Community - GEC Samastipur</p>
+                <hr style="border-color: #00f0ff;">
+                <p style="text-align: center; font-size: 11px;">C3 Community - GEC Samastipur</p>
             </div>
         `
     };
@@ -80,7 +91,7 @@ const sendOTPEmail = async (email, otp) => {
     }
 };
 
-// ========== NEW - Work Assignment Email Notification ==========
+// ========== Work Assignment Email ==========
 const sendWorkAssignedEmail = async (email, workDetails) => {
     const { title, description, dueDate, priority, assignedByName } = workDetails;
     
@@ -90,38 +101,31 @@ const sendWorkAssignedEmail = async (email, workDetails) => {
     const priorityText = priority === 'high' ? '🔴 High' : priority === 'medium' ? '🟡 Medium' : '🟢 Low';
     
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: FROM_EMAIL,
         to: email,
         subject: `📋 New Work Assigned: ${title} - C3 Community`,
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #00f0ff; border-radius: 16px;">
-                <div style="text-align: center;">
-                    <h2 style="color: #00f0ff;">📋 New Task Assigned!</h2>
-                </div>
+                <h2 style="text-align: center; color: #00f0ff;">📋 New Task Assigned!</h2>
                 
                 <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
-                    <h3 style="color: #00f0ff; margin-bottom: 15px;">${title}</h3>
+                    <h3 style="color: #00f0ff;">${title}</h3>
+                    <p>${description}</p>
                     
-                    <p style="color: #333333; line-height: 1.6;">${description}</p>
-                    
-                    <div style="margin: 15px 0; padding: 10px; background: #e0e0e0; border-radius: 8px;">
-                        <p><strong style="color: #00f0ff;">Priority:</strong> <span style="color: ${priorityColor};">${priorityText}</span></p>
-                        ${dueDate ? `<p><strong style="color: #00f0ff;">Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>` : ''}
-                        <p><strong style="color: #00f0ff;">Assigned By:</strong> ${assignedByName}</p>
+                    <div style="margin-top: 15px; padding: 10px; background: #e0e0e0; border-radius: 8px;">
+                        <p><strong>Priority:</strong> <span style="color: ${priorityColor};">${priorityText}</span></p>
+                        ${dueDate ? `<p><strong>Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>` : ''}
+                        <p><strong>Assigned By:</strong> ${assignedByName}</p>
                     </div>
                 </div>
                 
                 <div style="text-align: center;">
                     <a href="${dashboardLink}" 
                        style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); 
-                              color: #ffffff; text-decoration: none; border-radius: 8px; margin: 10px 0;">
+                              color: white; text-decoration: none; border-radius: 8px;">
                         View My Tasks
                     </a>
                 </div>
-                
-                <p style="text-align: center; font-size: 12px; color: #666; margin-top: 20px;">
-                    Login to your dashboard to update task status.
-                </p>
             </div>
         `
     };
@@ -136,36 +140,34 @@ const sendWorkAssignedEmail = async (email, workDetails) => {
     }
 };
 
-// ========== NEW - Work Completed Notification (to Super Admin) ==========
+// ========== Work Completed Notification ==========
 const sendWorkCompletedEmail = async (adminEmail, workDetails) => {
     const { title, completedByName, completedByEmail, remarks } = workDetails;
     
     const adminLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/admin-super-dashboard.html`;
     
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: FROM_EMAIL,
         to: adminEmail,
         subject: `✅ Work Completed: ${title} - C3 Community`,
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #10b981; border-radius: 16px;">
-                <div style="text-align: center;">
-                    <h2 style="color: #10b981;">✅ Task Completed!</h2>
-                </div>
+                <h2 style="text-align: center; color: #10b981;">✅ Task Completed!</h2>
                 
                 <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
                     <h3 style="color: #00f0ff;">${title}</h3>
                     
-                    <div style="margin: 15px 0; padding: 10px; background: #e0e0e0; border-radius: 8px;">
-                        <p><strong style="color: #00f0ff;">Completed By:</strong> ${completedByName} (${completedByEmail})</p>
-                        ${remarks ? `<p><strong style="color: #00f0ff;">Remarks:</strong> ${remarks}</p>` : ''}
-                        <p><strong style="color: #00f0ff;">Completed At:</strong> ${new Date().toLocaleString()}</p>
+                    <div style="margin-top: 15px; padding: 10px; background: #e0e0e0; border-radius: 8px;">
+                        <p><strong>Completed By:</strong> ${completedByName} (${completedByEmail})</p>
+                        ${remarks ? `<p><strong>Remarks:</strong> ${remarks}</p>` : ''}
+                        <p><strong>Completed At:</strong> ${new Date().toLocaleString()}</p>
                     </div>
                 </div>
                 
                 <div style="text-align: center;">
                     <a href="${adminLink}" 
                        style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); 
-                              color: #ffffff; text-decoration: none; border-radius: 8px; margin: 10px 0;">
+                              color: white; text-decoration: none; border-radius: 8px;">
                         Go to Admin Dashboard
                     </a>
                 </div>
@@ -183,12 +185,12 @@ const sendWorkCompletedEmail = async (adminEmail, workDetails) => {
     }
 };
 
-// ========== NEW - New Member Added Notification (SIMPLIFIED - NO EXTERNAL IMAGES) ==========
+// ========== New Member Welcome Email ==========
 const sendNewMemberEmail = async (email, name, position) => {
     const loginLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/admin-team-login.html`;
     
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: FROM_EMAIL,
         to: email,
         subject: '🎉 Welcome to C3 Admin Team! - Creative Coding Community',
         html: `
@@ -203,12 +205,12 @@ const sendNewMemberEmail = async (email, name, position) => {
                 <div style="text-align: center;">
                     <a href="${loginLink}" 
                        style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); 
-                              color: #ffffff; text-decoration: none; border-radius: 8px; margin: 10px 0;">
+                              color: white; text-decoration: none; border-radius: 8px;">
                         Login to Admin Portal
                     </a>
                 </div>
                 
-                <p style="text-align: center; font-size: 12px; color: #666; margin-top: 20px;">
+                <p style="text-align: center; font-size: 12px; margin-top: 20px;">
                     Use your email to receive OTP for login. No password needed!
                 </p>
             </div>
