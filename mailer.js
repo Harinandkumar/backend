@@ -43,7 +43,7 @@ const sendVerificationEmail = async (email, token) => {
     }
 };
 
-// ========== NEW - OTP Email for Team Login ==========
+// ========== UPDATED - OTP Email for Team Login (SIMPLIFIED - NO EXTERNAL IMAGES) ==========
 const sendOTPEmail = async (email, otp) => {
     const mailOptions = {
         from: process.env.EMAIL_USER,
@@ -51,25 +51,21 @@ const sendOTPEmail = async (email, otp) => {
         subject: '🔐 Your C3 Admin Login OTP - Creative Coding Community',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <img src="https://c3community.netlify.app/assets/img/logowithoutname.png" alt="C3 Logo" style="width: 60px; height: 60px;">
-                    <h2 style="color: #00f0ff; margin-top: 10px;">Creative Coding Community</h2>
-                </div>
-                
-                <h3 style="text-align: center; color: #ffffff;">Admin Portal Login OTP</h3>
+                <h2 style="text-align: center; color: #00f0ff; margin-top: 0;">Creative Coding Community</h2>
+                <h3 style="text-align: center; color: #333333;">Admin Portal Login OTP</h3>
                 
                 <div style="text-align: center; padding: 20px; margin: 20px 0;">
-                    <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; background: #1a1f2d; padding: 20px; border-radius: 12px; color: #00f0ff; font-family: monospace;">
+                    <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; background: #f0f0f0; padding: 20px; border-radius: 12px; color: #00f0ff; font-family: monospace;">
                         ${otp}
                     </div>
                 </div>
                 
-                <p style="text-align: center; color: #a0a0b0;">This OTP is valid for <strong style="color: #00f0ff;">5 minutes</strong>.</p>
-                <p style="text-align: center; color: #a0a0b0; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+                <p style="text-align: center;">This OTP is valid for <strong style="color: #00f0ff;">5 minutes</strong>.</p>
+                <p style="text-align: center; font-size: 12px; color: #888888;">If you didn't request this, please ignore this email.</p>
                 
                 <hr style="border-color: #00f0ff; margin: 20px 0;">
                 
-                <p style="text-align: center; font-size: 12px; color: #666;">C3 Community - GEC Samastipur</p>
+                <p style="text-align: center; font-size: 11px; color: #888888;">C3 Community - GEC Samastipur</p>
             </div>
         `
     };
@@ -103,12 +99,12 @@ const sendWorkAssignedEmail = async (email, workDetails) => {
                     <h2 style="color: #00f0ff;">📋 New Task Assigned!</h2>
                 </div>
                 
-                <div style="background: #1a1f2d; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
                     <h3 style="color: #00f0ff; margin-bottom: 15px;">${title}</h3>
                     
-                    <p style="color: #ffffff; line-height: 1.6;">${description}</p>
+                    <p style="color: #333333; line-height: 1.6;">${description}</p>
                     
-                    <div style="margin: 15px 0; padding: 10px; background: #0a0e17; border-radius: 8px;">
+                    <div style="margin: 15px 0; padding: 10px; background: #e0e0e0; border-radius: 8px;">
                         <p><strong style="color: #00f0ff;">Priority:</strong> <span style="color: ${priorityColor};">${priorityText}</span></p>
                         ${dueDate ? `<p><strong style="color: #00f0ff;">Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>` : ''}
                         <p><strong style="color: #00f0ff;">Assigned By:</strong> ${assignedByName}</p>
@@ -156,10 +152,10 @@ const sendWorkCompletedEmail = async (adminEmail, workDetails) => {
                     <h2 style="color: #10b981;">✅ Task Completed!</h2>
                 </div>
                 
-                <div style="background: #1a1f2d; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
                     <h3 style="color: #00f0ff;">${title}</h3>
                     
-                    <div style="margin: 15px 0; padding: 10px; background: #0a0e17; border-radius: 8px;">
+                    <div style="margin: 15px 0; padding: 10px; background: #e0e0e0; border-radius: 8px;">
                         <p><strong style="color: #00f0ff;">Completed By:</strong> ${completedByName} (${completedByEmail})</p>
                         ${remarks ? `<p><strong style="color: #00f0ff;">Remarks:</strong> ${remarks}</p>` : ''}
                         <p><strong style="color: #00f0ff;">Completed At:</strong> ${new Date().toLocaleString()}</p>
@@ -187,7 +183,7 @@ const sendWorkCompletedEmail = async (adminEmail, workDetails) => {
     }
 };
 
-// ========== NEW - New Member Added Notification ==========
+// ========== NEW - New Member Added Notification (SIMPLIFIED - NO EXTERNAL IMAGES) ==========
 const sendNewMemberEmail = async (email, name, position) => {
     const loginLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/admin-team-login.html`;
     
@@ -197,12 +193,9 @@ const sendNewMemberEmail = async (email, name, position) => {
         subject: '🎉 Welcome to C3 Admin Team! - Creative Coding Community',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;">
-                <div style="text-align: center;">
-                    <img src="https://c3community.netlify.app/assets/img/logowithoutname.png" alt="C3 Logo" style="width: 60px; height: 60px;">
-                    <h2 style="color: #00f0ff;">Welcome to the Team, ${name}! 🎉</h2>
-                </div>
+                <h2 style="text-align: center; color: #00f0ff;">Welcome to the Team, ${name}! 🎉</h2>
                 
-                <div style="background: #1a1f2d; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 12px; margin: 20px 0;">
                     <p>You have been added as a <strong style="color: #00f0ff;">${position}</strong> in the C3 Community Admin Team.</p>
                     <p>You can now access the admin portal using OTP login.</p>
                 </div>
