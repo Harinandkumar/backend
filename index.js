@@ -47,7 +47,7 @@ const seedSuperAdmin = async () => {
         if (!existingSuperAdmin) {
             const superAdmin = new TeamMember({
                 name: 'Super Admin',
-                email: 'creativecodingcommunity.cs@gmail.com',  // ✅ CORRECT EMAIL
+                email: 'creativecodingcommunity.cs@gmail.com',
                 position: 'Super Admin',
                 role: 'super_admin',
                 phone: '0000000000',
@@ -66,16 +66,14 @@ const seedSuperAdmin = async () => {
             await superAdmin.save();
             console.log('✅ Super Admin created!');
             console.log('📧 Email: creativecodingcommunity.cs@gmail.com');
-            console.log('🔐 Use OTP login - no password needed');
-            console.log('🌐 Login URL: https://c3community.netlify.app/admin-team-login.html');
+            console.log('🔐 Use OTP login');
         } else {
             console.log('✅ Super Admin already exists');
-            // Update existing super admin email if different
             const existing = await TeamMember.findOne({ role: 'super_admin' });
             if (existing && existing.email !== 'creativecodingcommunity.cs@gmail.com') {
                 existing.email = 'creativecodingcommunity.cs@gmail.com';
                 await existing.save();
-                console.log('✅ Super Admin email updated to: creativecodingcommunity.cs@gmail.com');
+                console.log('✅ Super Admin email updated');
             }
         }
     } catch (error) {
@@ -192,7 +190,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
-// ========== OLD ADMIN LOGIN (Keep for backward compatibility) ==========
+// ========== OLD ADMIN LOGIN ==========
 app.post("/admin-login", async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -352,10 +350,10 @@ app.use('/api/team', teamAuthRoutes);
 // Team Management Routes (Super Admin only)
 app.use('/api/team', teamManagementRoutes);
 
-// Work Assignment Routes
-app.use('/api/work', workRoutes);
+// ✅ FIXED: Work Assignment Routes (correct mount point)
+app.use('/api/team/work', workRoutes);  // 👈 YEH LINE CHANGE KARI HAI
 
-// ========== ADMIN VERIFY ENDPOINT (Existing) ==========
+// ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
@@ -376,7 +374,6 @@ app.listen(PORT, async () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📧 Email service: ${process.env.EMAIL_USER ? 'Configured' : 'Not configured'}`);
     
-    // Seed super admin after database connection
     setTimeout(async () => {
         await seedSuperAdmin();
     }, 3000);
