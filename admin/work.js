@@ -3,6 +3,7 @@ const router = express.Router();
 const WorkAssignment = require('../schemas/workAssignment');
 const TeamMember = require('../schemas/teamMember');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
+const { sendWorkAssignedEmail } = require('../mailer');  // ✅ ADD THIS LINE
 
 // Get all works (Super Admin only)
 router.get('/all', teamAuth, isSuperAdmin, async (req, res) => {
@@ -32,7 +33,6 @@ router.get('/my', teamAuth, async (req, res) => {
             .populate('assignedBy', 'name email')
             .sort({ createdAt: -1 });
         
-        // Get counts
         const pending = works.filter(w => w.status === 'pending').length;
         const inProgress = works.filter(w => w.status === 'in_progress').length;
         const completed = works.filter(w => w.status === 'completed').length;
@@ -43,7 +43,7 @@ router.get('/my', teamAuth, async (req, res) => {
     }
 });
 
-// Assign work (Super Admin only)
+// ✅ Assign work (Super Admin only) - WITH EMAIL FIXED
 router.post('/assign', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { title, description, assignedTo, category, priority, dueDate, remarks, attachments } = req.body;
@@ -73,11 +73,28 @@ router.post('/assign', teamAuth, isSuperAdmin, async (req, res) => {
         
         await work.save();
         
-        // TODO: Send email notification to assigned member
-        // await sendWorkAssignedEmail(member.email, work);
+        // ✅ SEND EMAIL NOTIFICATION TO ASSIGNED MEMBER (FIXED)
+        try {
+            const emailSent = await sendWorkAssignedEmail(member.email, {
+                title: title,
+                description: description,
+                dueDate: dueDate,
+                priority: priority || 'medium',
+                assignedByName: req.teamMember.name
+            });
+            if (emailSent) {
+                console.log('✅ Work assignment email sent to:', member.email);
+            } else {
+                console.log('⚠️ Work assigned but email failed to send');
+            }
+        } catch (emailError) {
+            console.error('❌ Email error (work assigned but email failed):', emailError.message);
+            // Don't fail the request if email fails
+        }
         
         res.status(201).json({ message: 'Work assigned successfully', work });
     } catch (error) {
+        console.error('Assign work error:', error);
         res.status(400).json({ message: error.message });
     }
 });
@@ -90,7 +107,6 @@ router.put('/:id/status', teamAuth, async (req, res) => {
         
         if (!work) return res.status(404).json({ message: 'Work not found' });
         
-        // Check if member is assigned to this work or is super admin
         if (work.assignedTo.toString() !== req.teamMember._id.toString() && req.teamMember.role !== 'super_admin') {
             return res.status(403).json({ message: 'You are not authorized to update this work' });
         }
@@ -153,7 +169,6 @@ router.get('/stats/overview', teamAuth, isSuperAdmin, async (req, res) => {
         const completed = await WorkAssignment.countDocuments({ status: 'completed' });
         const highPriority = await WorkAssignment.countDocuments({ priority: 'high', status: { $ne: 'completed' } });
         
-        // Member-wise stats
         const memberStats = await WorkAssignment.aggregate([
             { $group: {
                 _id: '$assignedTo',
