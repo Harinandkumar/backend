@@ -6,6 +6,7 @@ const Gallery = require('../schemas/gallery');
 const Category = require('../schemas/category');
 const NavItem = require('../schemas/navItem');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
+const { sendWelcomeEmailToNewMember } = require('../mailer');  // 👈 Import email function
 
 // ========== TEAM MEMBERS MANAGEMENT ==========
 
@@ -34,7 +35,7 @@ router.get('/team-member/:id', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// ✅ Add new team member (Super Admin only)
+// ✅ Add new team member (Super Admin only) - WITH WELCOME EMAIL
 router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, email, position, role, phone, profileImage, permissions } = req.body;
@@ -95,7 +96,17 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
         });
         
         await member.save();
-        res.status(201).json({ message: 'Team member added successfully', member });
+        
+        // ========== SEND WELCOME EMAIL ==========
+        try {
+            await sendWelcomeEmailToNewMember(email, name, role, finalPermissions, req.teamMember.name);
+            console.log('✅ Welcome email sent to:', email);
+        } catch (emailError) {
+            console.error('⚠️ Member added but email failed:', emailError.message);
+            // Don't fail the request if email fails
+        }
+        
+        res.status(201).json({ message: 'Team member added successfully. Welcome email sent!', member });
     } catch (error) {
         console.error('Error adding team member:', error);
         res.status(400).json({ message: error.message });

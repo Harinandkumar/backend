@@ -11,7 +11,6 @@ const sendBrevoEmail = async (toEmail, subject, htmlContent) => {
             return reject(new Error('BREVO_API_KEY missing'));
         }
         
-        // ✅ CORRECT JSON FORMAT as per Brevo API v3
         const postData = JSON.stringify({
             sender: {
                 name: 'C3 Community',
@@ -25,7 +24,6 @@ const sendBrevoEmail = async (toEmail, subject, htmlContent) => {
         });
         
         console.log('📧 Sending email to:', toEmail);
-        console.log('📧 Using API Key:', apiKey.substring(0, 15) + '...');
         
         const options = {
             hostname: 'api.brevo.com',
@@ -69,7 +67,7 @@ const sendBrevoEmail = async (toEmail, subject, htmlContent) => {
     });
 };
 
-// ========== Email Verification ==========
+// ========== Email Verification (Signup) - WORKING ==========
 const sendVerificationEmail = async (email, token) => {
     const verificationLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/email_verify.html?token=${token}`;
     
@@ -92,7 +90,7 @@ const sendVerificationEmail = async (email, token) => {
     }
 };
 
-// ========== OTP Email ==========
+// ========== OTP Email for Team Login - WORKING ==========
 const sendOTPEmail = async (email, otp) => {
     const html = `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 16px;">
@@ -170,7 +168,7 @@ const sendWorkCompletedEmail = async (adminEmail, workDetails) => {
     }
 };
 
-// ========== New Member Welcome ==========
+// ========== New Member Welcome (Team Member) ==========
 const sendNewMemberEmail = async (email, name, position) => {
     const loginLink = `${process.env.FRONTEND_URL || 'https://c3community.netlify.app'}/admin-team-login.html`;
     
@@ -192,10 +190,90 @@ const sendNewMemberEmail = async (email, name, position) => {
     }
 };
 
+// ========== ⭐ NEW: Welcome Email for Team Member with Full Details ==========
+const sendWelcomeEmailToNewMember = async (email, name, role, permissions, addedBy) => {
+    const loginUrl = 'https://c3community.netlify.app/admin-login.html';
+    const dashboardUrl = 'https://c3community.netlify.app/admin-dashboard.html';
+    
+    let roleDisplay = '';
+    if (role === 'super_admin') roleDisplay = '👑 Super Admin';
+    else if (role === 'core_member') roleDisplay = '⭐ Core Member';
+    else if (role === 'coordinator') roleDisplay = '📋 Coordinator';
+    else roleDisplay = '🟢 Sub-Coordinator';
+    
+    const getPermIcon = (value) => value ? '✅' : '❌';
+    
+    const permissionsHtml = `
+        <div style="margin: 15px 0; padding: 15px; background: #0a0e17; border-radius: 12px; color: #fff;">
+            <h4 style="color: #00f0ff; margin-bottom: 12px;">📋 Your Access Rights:</h4>
+            <div style="margin-bottom: 8px;"><p style="font-weight: bold; color: #00f0ff; margin: 0;">📅 Events:</p><p style="margin: 5px 0 0 15px;">${getPermIcon(permissions.events?.create)} Create | ${getPermIcon(permissions.events?.edit)} Edit | ${getPermIcon(permissions.events?.delete)} Delete</p></div>
+            <div style="margin-bottom: 8px;"><p style="font-weight: bold; color: #00f0ff; margin: 0;">🔔 Notifications:</p><p style="margin: 5px 0 0 15px;">${getPermIcon(permissions.notifications?.create)} Create | ${getPermIcon(permissions.notifications?.delete)} Delete</p></div>
+            <div style="margin-bottom: 8px;"><p style="font-weight: bold; color: #00f0ff; margin: 0;">📸 Gallery:</p><p style="margin: 5px 0 0 15px;">${getPermIcon(permissions.gallery?.upload)} Upload | ${getPermIcon(permissions.gallery?.delete)} Delete</p></div>
+            <div style="margin-bottom: 8px;"><p style="font-weight: bold; color: #00f0ff; margin: 0;">👥 Members:</p><p style="margin: 5px 0 0 15px;">${getPermIcon(permissions.members?.view)} View | ${getPermIcon(permissions.members?.delete)} Delete</p></div>
+            <div style="margin-bottom: 8px;"><p style="font-weight: bold; color: #00f0ff; margin: 0;">🏷️ Categories:</p><p style="margin: 5px 0 0 15px;">${getPermIcon(permissions.categories?.create)} Create | ${getPermIcon(permissions.categories?.edit)} Edit | ${getPermIcon(permissions.categories?.delete)} Delete</p></div>
+            <div style="margin-bottom: 8px;"><p style="font-weight: bold; color: #00f0ff; margin: 0;">📋 Nav Items:</p><p style="margin: 5px 0 0 15px;">${getPermIcon(permissions.navItems?.create)} Create | ${getPermIcon(permissions.navItems?.edit)} Edit | ${getPermIcon(permissions.navItems?.delete)} Delete</p></div>
+        </div>
+    `;
+    
+    const html = `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 20px; background: #fff;">
+            <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #00f0ff;">
+                <img src="https://c3community.netlify.app/assets/img/logowithoutname.png" alt="C3 Logo" style="width: 70px; height: 70px;">
+                <h2 style="color: #00f0ff; margin: 10px 0 0 0;">Creative Coding Community</h2>
+                <p style="color: #666;">GEC Samastipur</p>
+            </div>
+            
+            <div style="text-align: center; padding: 20px 0;">
+                <h1 style="color: #333;">Welcome ${name}! 🎉</h1>
+                <p style="color: #666;">You've been added to the C3 Admin Team</p>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #00f0ff20, #ff2d7520); padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 18px;">Your Role: <strong style="color: #00f0ff;">${roleDisplay}</strong></p>
+                <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">Added by: ${addedBy || 'Super Admin'}</p>
+            </div>
+            
+            ${permissionsHtml}
+            
+            <div style="background: #f5f5f5; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #00f0ff; margin-top: 0;">🔐 How to Login</h3>
+                <ol style="margin-left: 20px; line-height: 1.8; color: #333;">
+                    <li>Go to: <strong style="color: #00f0ff;">${loginUrl}</strong></li>
+                    <li>Click on <strong>"📧 OTP Login"</strong> tab</li>
+                    <li>Enter your email: <strong>${email}</strong></li>
+                    <li>Click <strong>"Send OTP"</strong></li>
+                    <li>Enter the OTP and click <strong>"Verify & Login"</strong></li>
+                </ol>
+            </div>
+            
+            <div style="text-align: center; padding: 15px;">
+                <a href="${loginUrl}" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); color: white; text-decoration: none; border-radius: 50px; margin: 0 10px 10px 0;">🔐 Login Now</a>
+                <a href="${dashboardUrl}" style="display: inline-block; padding: 12px 30px; background: #333; color: white; text-decoration: none; border-radius: 50px;">📊 View Dashboard</a>
+            </div>
+            
+            <div style="text-align: center; padding-top: 20px; margin-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
+                <p>Creative Coding Community - GEC Samastipur</p>
+                <p>For support: creativecodingcommunity.cs@gmail.com</p>
+            </div>
+        </div>
+    `;
+    
+    try {
+        await sendBrevoEmail(email, `🎉 Welcome to C3 Admin Team, ${name}!`, html);
+        console.log('✅ Welcome email sent to:', email);
+        return true;
+    } catch (error) {
+        console.error('❌ Error sending welcome email:', error.message);
+        return false;
+    }
+};
+
+// ========== EXPORT ALL FUNCTIONS ==========
 module.exports = { 
     sendVerificationEmail,
     sendOTPEmail,
     sendWorkAssignedEmail,
     sendWorkCompletedEmail,
-    sendNewMemberEmail
+    sendNewMemberEmail,
+    sendWelcomeEmailToNewMember  // ⭐ NEW
 };
