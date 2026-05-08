@@ -8,22 +8,45 @@ const NavItem = require('../schemas/navItem');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
 
 // ========== TEAM MEMBERS MANAGEMENT ==========
-// Get all team members (Super Admin only)
+
+// ✅ Get all team members (Super Admin only)
 router.get('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const members = await TeamMember.find({}).select('-__v').sort({ createdAt: -1 });
         res.json({ members, count: members.length });
     } catch (error) {
+        console.error('Error fetching team members:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// Add new team member (Super Admin only)
+// ✅ Get single team member by ID (for editing permissions)
+router.get('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
+    try {
+        const member = await TeamMember.findById(req.params.id).select('-__v');
+        if (!member) {
+            return res.status(404).json({ message: 'Team member not found' });
+        }
+        res.json(member);
+    } catch (error) {
+        console.error('Error fetching team member:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// ✅ Add new team member (Super Admin only)
 router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, email, position, role, phone, profileImage, permissions } = req.body;
+        
+        if (!name || !email || !role) {
+            return res.status(400).json({ message: 'Name, email and role are required' });
+        }
+        
         const existing = await TeamMember.findOne({ email: email.toLowerCase() });
-        if (existing) return res.status(400).json({ message: 'Email already exists' });
+        if (existing) {
+            return res.status(400).json({ message: 'Email already exists' });
+        }
         
         let defaultPermissions = {
             events: { create: false, edit: false, delete: false },
@@ -58,25 +81,37 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
         }
         
         const finalPermissions = permissions || defaultPermissions;
+        
         const member = new TeamMember({
-            name, email: email.toLowerCase(),
+            name,
+            email: email.toLowerCase(),
             position: position || (role === 'core_member' ? 'Core Member' : role === 'coordinator' ? 'Coordinator' : 'Sub-Coordinator'),
-            role, phone: phone || '', profileImage: profileImage || '',
-            permissions: finalPermissions, createdBy: req.teamMember._id, isActive: true
+            role,
+            phone: phone || '',
+            profileImage: profileImage || '',
+            permissions: finalPermissions,
+            createdBy: req.teamMember._id,
+            isActive: true
         });
+        
         await member.save();
         res.status(201).json({ message: 'Team member added successfully', member });
     } catch (error) {
+        console.error('Error adding team member:', error);
         res.status(400).json({ message: error.message });
     }
 });
 
-// Update team member
+// ✅ Update team member (Super Admin only)
 router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, position, role, phone, profileImage, isActive, permissions } = req.body;
         const member = await TeamMember.findById(req.params.id);
-        if (!member) return res.status(404).json({ message: 'Member not found' });
+        
+        if (!member) {
+            return res.status(404).json({ message: 'Team member not found' });
+        }
+        
         if (name) member.name = name;
         if (position) member.position = position;
         if (role) member.role = role;
@@ -84,29 +119,37 @@ router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
         if (profileImage) member.profileImage = profileImage;
         if (isActive !== undefined) member.isActive = isActive;
         if (permissions) member.permissions = permissions;
+        
         await member.save();
         res.json({ message: 'Member updated successfully', member });
     } catch (error) {
+        console.error('Error updating team member:', error);
         res.status(400).json({ message: error.message });
     }
 });
 
-// Delete team member
+// ✅ Delete team member (Super Admin only)
 router.delete('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.params.id);
-        if (!member) return res.status(404).json({ message: 'Member not found' });
+        if (!member) {
+            return res.status(404).json({ message: 'Team member not found' });
+        }
+        
+        // Prevent deleting yourself
         if (member._id.toString() === req.teamMember._id.toString()) {
             return res.status(400).json({ message: 'You cannot delete yourself' });
         }
+        
         await TeamMember.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Member deleted successfully' });
+        res.json({ message: 'Team member deleted successfully' });
     } catch (error) {
+        console.error('Error deleting team member:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// Get current team member profile
+// ✅ Get current team member profile
 router.get('/me', teamAuth, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.teamMember._id).select('-__v');
@@ -117,7 +160,8 @@ router.get('/me', teamAuth, async (req, res) => {
 });
 
 // ========== USERS (REGULAR MEMBERS) MANAGEMENT ==========
-// Get all users/students (for members panel)
+
+// ✅ Get all users/students (for members panel)
 router.get('/users', teamAuth, hasPermission('members', 'view'), async (req, res) => {
     try {
         const { batch, search } = req.query;
@@ -133,22 +177,27 @@ router.get('/users', teamAuth, hasPermission('members', 'view'), async (req, res
         const users = await User.find(query).select('-password').sort({ name: 1 });
         res.json(users);
     } catch (error) {
+        console.error('Error fetching users:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// Delete user (regular user) - requires permission
+// ✅ Delete user (regular user) - requires permission
 router.delete('/users/:id', teamAuth, hasPermission('members', 'delete'), async (req, res) => {
     try {
         const user = await User.findByIdAndDelete(req.params.id);
-        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
+        console.error('Error deleting user:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
 // ========== EVENTS MANAGEMENT ==========
+
 // Get all events
 router.get('/events', teamAuth, async (req, res) => {
     try {
@@ -202,6 +251,7 @@ router.delete('/events/:id', teamAuth, hasPermission('events', 'delete'), async 
 });
 
 // ========== NOTIFICATIONS MANAGEMENT ==========
+
 // Get all notifications
 router.get('/notifications', teamAuth, async (req, res) => {
     try {
@@ -241,6 +291,7 @@ router.delete('/notifications/:id', teamAuth, hasPermission('notifications', 'de
 });
 
 // ========== GALLERY MANAGEMENT ==========
+
 // Get all gallery images
 router.get('/gallery', teamAuth, async (req, res) => {
     try {
@@ -295,6 +346,7 @@ router.delete('/gallery/:id', teamAuth, hasPermission('gallery', 'delete'), asyn
 });
 
 // ========== CATEGORIES MANAGEMENT ==========
+
 // Get all categories
 router.get('/categories', teamAuth, async (req, res) => {
     try {
@@ -339,7 +391,7 @@ router.delete('/categories/:id', teamAuth, hasPermission('categories', 'delete')
         if (!category) return res.status(404).json({ message: 'Category not found' });
         const imagesUsing = await Gallery.countDocuments({ category: category.name });
         if (imagesUsing > 0) {
-            return res.status(400).json({ message: `Cannot delete: ${imagesUsing} images are using this category. Update those images first.` });
+            return res.status(400).json({ message: `Cannot delete: ${imagesUsing} images are using this category` });
         }
         await Category.findByIdAndDelete(req.params.id);
         res.json({ message: 'Category deleted' });
@@ -349,6 +401,7 @@ router.delete('/categories/:id', teamAuth, hasPermission('categories', 'delete')
 });
 
 // ========== NAVIGATION ITEMS MANAGEMENT ==========
+
 // Get all nav items
 router.get('/nav-items', teamAuth, async (req, res) => {
     try {
