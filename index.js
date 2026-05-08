@@ -373,7 +373,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📧 Email service: ${process.env.EMAIL_USER ? 'Configured' : 'Not configured'}`);
-    
+
     setTimeout(async () => {
         await seedSuperAdmin();
     }, 3000);
