@@ -20,8 +20,8 @@ router.get('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// ✅ Get single team member by ID (for editing permissions)
-router.get('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
+// ✅ Get single team member by ID (for permissions modal)
+router.get('/team-member/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.params.id).select('-__v');
         if (!member) {
