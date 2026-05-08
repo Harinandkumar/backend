@@ -9,7 +9,7 @@ const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAut
 
 // ========== TEAM MEMBERS MANAGEMENT ==========
 // Get all team members (Super Admin only)
-router.get('/members', teamAuth, isSuperAdmin, async (req, res) => {
+router.get('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const members = await TeamMember.find({}).select('-__v').sort({ createdAt: -1 });
         res.json({ members, count: members.length });
@@ -19,7 +19,7 @@ router.get('/members', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Add new team member (Super Admin only)
-router.post('/members', teamAuth, isSuperAdmin, async (req, res) => {
+router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, email, position, role, phone, profileImage, permissions } = req.body;
         const existing = await TeamMember.findOne({ email: email.toLowerCase() });
@@ -72,7 +72,7 @@ router.post('/members', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Update team member
-router.put('/members/:id', teamAuth, isSuperAdmin, async (req, res) => {
+router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, position, role, phone, profileImage, isActive, permissions } = req.body;
         const member = await TeamMember.findById(req.params.id);
@@ -92,7 +92,7 @@ router.put('/members/:id', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Delete team member
-router.delete('/members/:id', teamAuth, isSuperAdmin, async (req, res) => {
+router.delete('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.params.id);
         if (!member) return res.status(404).json({ message: 'Member not found' });
@@ -116,7 +116,39 @@ router.get('/me', teamAuth, async (req, res) => {
     }
 });
 
-// ========== EVENTS MANAGEMENT (For Dashboard) ==========
+// ========== USERS (REGULAR MEMBERS) MANAGEMENT ==========
+// Get all users/students (for members panel)
+router.get('/users', teamAuth, hasPermission('members', 'view'), async (req, res) => {
+    try {
+        const { batch, search } = req.query;
+        let query = {};
+        if (batch) query.batch = batch;
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+                { regno: { $regex: search, $options: 'i' } }
+            ];
+        }
+        const users = await User.find(query).select('-password').sort({ name: 1 });
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Delete user (regular user) - requires permission
+router.delete('/users/:id', teamAuth, hasPermission('members', 'delete'), async (req, res) => {
+    try {
+        const user = await User.findByIdAndDelete(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// ========== EVENTS MANAGEMENT ==========
 // Get all events
 router.get('/events', teamAuth, async (req, res) => {
     try {
@@ -127,7 +159,7 @@ router.get('/events', teamAuth, async (req, res) => {
     }
 });
 
-// Create event (requires permission)
+// Create event
 router.post('/events/create', teamAuth, hasPermission('events', 'create'), async (req, res) => {
     try {
         const { name, imagelink, date, location, prize, pdflink, description, isOpen } = req.body;
@@ -145,7 +177,7 @@ router.post('/events/create', teamAuth, hasPermission('events', 'create'), async
     }
 });
 
-// Update event (requires permission)
+// Update event
 router.put('/events/:id', teamAuth, hasPermission('events', 'edit'), async (req, res) => {
     try {
         const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -156,7 +188,7 @@ router.put('/events/:id', teamAuth, hasPermission('events', 'edit'), async (req,
     }
 });
 
-// Delete event (requires permission)
+// Delete event
 router.delete('/events/:id', teamAuth, hasPermission('events', 'delete'), async (req, res) => {
     try {
         const event = await Event.findById(req.params.id);
@@ -164,38 +196,6 @@ router.delete('/events/:id', teamAuth, hasPermission('events', 'delete'), async 
         await User.updateMany({ 'events.eventId': event._id }, { $pull: { events: { eventId: event._id } } });
         await Event.findByIdAndDelete(req.params.id);
         res.json({ message: 'Event deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// ========== MEMBERS MANAGEMENT (User CRUD) ==========
-// Get all members (requires permission)
-router.get('/members-list', teamAuth, hasPermission('members', 'view'), async (req, res) => {
-    try {
-        const { batch, search } = req.query;
-        let query = {};
-        if (batch) query.batch = batch;
-        if (search) {
-            query.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
-                { regno: { $regex: search, $options: 'i' } }
-            ];
-        }
-        const members = await User.find(query).select('-password').sort({ name: 1 });
-        res.json({ members, count: members.length });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Delete member (regular user) - requires permission
-router.delete('/members/:id', teamAuth, hasPermission('members', 'delete'), async (req, res) => {
-    try {
-        const member = await User.findByIdAndDelete(req.params.id);
-        if (!member) return res.status(404).json({ message: 'Member not found' });
-        res.json({ message: 'Member deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -212,7 +212,7 @@ router.get('/notifications', teamAuth, async (req, res) => {
     }
 });
 
-// Create notification (requires permission)
+// Create notification
 router.post('/notifications/create', teamAuth, hasPermission('notifications', 'create'), async (req, res) => {
     try {
         const { title, message, isPriority, badge, button1Text, button1Link, button2Text, button2Link } = req.body;
@@ -229,7 +229,7 @@ router.post('/notifications/create', teamAuth, hasPermission('notifications', 'c
     }
 });
 
-// Delete notification (requires permission)
+// Delete notification
 router.delete('/notifications/:id', teamAuth, hasPermission('notifications', 'delete'), async (req, res) => {
     try {
         const notification = await Notification.findByIdAndDelete(req.params.id);
@@ -251,7 +251,7 @@ router.get('/gallery', teamAuth, async (req, res) => {
     }
 });
 
-// Upload image (requires permission)
+// Upload image
 const { upload } = require('../config/cloudinary');
 router.post('/gallery/upload', teamAuth, hasPermission('gallery', 'upload'), upload.single('image'), async (req, res) => {
     try {
@@ -268,7 +268,7 @@ router.post('/gallery/upload', teamAuth, hasPermission('gallery', 'upload'), upl
     }
 });
 
-// Update image (requires permission)
+// Update image
 router.put('/gallery/:id', teamAuth, hasPermission('gallery', 'upload'), async (req, res) => {
     try {
         const { title, category } = req.body;
@@ -280,7 +280,7 @@ router.put('/gallery/:id', teamAuth, hasPermission('gallery', 'upload'), async (
     }
 });
 
-// Delete image (requires permission)
+// Delete image
 router.delete('/gallery/:id', teamAuth, hasPermission('gallery', 'delete'), async (req, res) => {
     try {
         const image = await Gallery.findById(req.params.id);
@@ -305,7 +305,7 @@ router.get('/categories', teamAuth, async (req, res) => {
     }
 });
 
-// Create category (requires permission)
+// Create category
 router.post('/categories', teamAuth, hasPermission('categories', 'create'), async (req, res) => {
     try {
         const { name, icon, color } = req.body;
@@ -320,7 +320,7 @@ router.post('/categories', teamAuth, hasPermission('categories', 'create'), asyn
     }
 });
 
-// Update category (requires permission)
+// Update category
 router.put('/categories/:id', teamAuth, hasPermission('categories', 'edit'), async (req, res) => {
     try {
         const { name, icon, color, isActive } = req.body;
@@ -332,14 +332,14 @@ router.put('/categories/:id', teamAuth, hasPermission('categories', 'edit'), asy
     }
 });
 
-// Delete category (requires permission)
+// Delete category
 router.delete('/categories/:id', teamAuth, hasPermission('categories', 'delete'), async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
         if (!category) return res.status(404).json({ message: 'Category not found' });
         const imagesUsing = await Gallery.countDocuments({ category: category.name });
         if (imagesUsing > 0) {
-            return res.status(400).json({ message: `Cannot delete: ${imagesUsing} images are using this category` });
+            return res.status(400).json({ message: `Cannot delete: ${imagesUsing} images are using this category. Update those images first.` });
         }
         await Category.findByIdAndDelete(req.params.id);
         res.json({ message: 'Category deleted' });
@@ -359,7 +359,7 @@ router.get('/nav-items', teamAuth, async (req, res) => {
     }
 });
 
-// Create nav item (requires permission)
+// Create nav item
 router.post('/nav-items', teamAuth, hasPermission('navItems', 'create'), async (req, res) => {
     try {
         const { name, link, icon, badge, target } = req.body;
@@ -376,7 +376,7 @@ router.post('/nav-items', teamAuth, hasPermission('navItems', 'create'), async (
     }
 });
 
-// Update nav item (requires permission)
+// Update nav item
 router.put('/nav-items/:id', teamAuth, hasPermission('navItems', 'edit'), async (req, res) => {
     try {
         const { name, link, icon, badge, target, isActive } = req.body;
@@ -388,7 +388,7 @@ router.put('/nav-items/:id', teamAuth, hasPermission('navItems', 'edit'), async 
     }
 });
 
-// Delete nav item (requires permission)
+// Delete nav item
 router.delete('/nav-items/:id', teamAuth, hasPermission('navItems', 'delete'), async (req, res) => {
     try {
         const item = await NavItem.findByIdAndDelete(req.params.id);
