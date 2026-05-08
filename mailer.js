@@ -1,31 +1,38 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// ========== GMAIL SMTP TRANSPORTER (RELIABLE) ==========
+// ========== BREVO SMTP TRANSPORTER (NO TIMEOUT) ==========
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,  // SSL
+    host: process.env.BREVO_HOST || 'smtp-relay.sendinblue.com',
+    port: parseInt(process.env.BREVO_PORT) || 587,
+    secure: false,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS  // App password (16 digit)
+        user: process.env.BREVO_USER,
+        pass: process.env.BREVO_PASS
     },
+    tls: {
+        ciphers: 'SSLv3',
+        rejectUnauthorized: false
+    },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
     pool: true,
-    maxConnections: 1,
-    connectionTimeout: 60000,
-    socketTimeout: 60000
+    maxConnections: 5,
+    rateDelta: 1000,
+    rateLimit: 10
 });
+
+const FROM_EMAIL = process.env.BREVO_FROM || 'creativecodingcommunity.cs@gmail.com';
 
 // Verify connection on startup
 transporter.verify((error, success) => {
     if (error) {
-        console.error('❌ Gmail SMTP connection FAILED:', error);
+        console.error('❌ Brevo SMTP connection FAILED:', error);
     } else {
-        console.log('✅ Gmail SMTP connection SUCCESS! Ready to send emails.');
+        console.log('✅ Brevo SMTP connection SUCCESS! Ready to send emails.');
     }
 });
-
-const FROM_EMAIL = process.env.EMAIL_USER;
 
 // ========== Email Verification (Signup) ==========
 const sendVerificationEmail = async (email, token) => {
