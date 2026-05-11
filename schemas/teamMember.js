@@ -31,6 +31,11 @@ const permissionSchema = new mongoose.Schema({
     teamManagement: {
         view: { type: Boolean, default: false },
         edit: { type: Boolean, default: false }
+    },
+    // ✅ NEW: Certificate permissions
+    certificates: {
+        upload: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false }
     }
 });
 
