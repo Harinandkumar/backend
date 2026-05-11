@@ -21,19 +21,20 @@ const notificationSchema = new mongoose.Schema({
     button2Link: { type: String, default: '' }
 });
 
-// User Schema
+// User Schema - UPDATED: rollno compulsory, regno optional
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     branch: { type: String, required: true },
     batch: { type: String, enum: ["22-26", "23-27", "24-28"], required: true },
-    regno: { type: String, required: true, unique: true },
+    rollno: { type: String, required: true, unique: true },  // ✅ Roll No - COMPULSORY
+    regno: { type: String, default: '', unique: false, sparse: true },  // ✅ Reg No - OPTIONAL
     mobileno: { type: String, required: true, unique: true },
     isverified: { type: Boolean, default: false },
     events: [joinedEventSchema],
     createdAt: { type: Date, default: Date.now },
-     // ✅ NEW: Forgot password fields
+    // Forgot password fields
     resetPasswordToken: { type: String, default: '' },
     resetPasswordExpires: { type: Date, default: null }
 });

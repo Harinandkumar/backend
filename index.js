@@ -19,6 +19,9 @@ const teamAuthRoutes = require('./admin/team-auth');
 const teamManagementRoutes = require('./admin/team');
 const workRoutes = require('./admin/work');
 
+// ========== CERTIFICATE ROUTES ==========
+const certificateRoutes = require('./admin/certificate');
+
 // ========== SCHEMAS FOR SEEDING ==========
 const TeamMember = require('./schemas/teamMember');
 
@@ -117,23 +120,43 @@ app.get("/api/notifications", async (req, res) => {
     }
 });
 
-// ========== AUTH ROUTES (USER) ==========
+// ========== AUTH ROUTES (USER) - UPDATED with rollno ==========
 app.post("/signup", async (req, res) => {
-    const { name, email, password, branch, batch, regno, mobileno } = req.body;
-    if (!name || !email || !password || !branch || !batch || !regno || !mobileno) {
-        return res.status(400).json({ message: "All fields are required" });
+    const { name, email, password, branch, batch, rollno, regno, mobileno } = req.body;
+    
+    // Roll no is compulsory, regno is optional
+    if (!name || !email || !password || !branch || !batch || !rollno || !mobileno) {
+        return res.status(400).json({ message: "All required fields (name, email, password, branch, batch, rollno, mobileno) must be filled" });
     }
+    
     try {
-        const existingUser = await User.findOne({ $or: [{ email }, { regno }, { mobileno }] });
+        // Check existing user by email, rollno, or mobileno
+        const existingUser = await User.findOne({ $or: [{ email }, { rollno }, { mobileno }] });
         if (existingUser) {
             if (existingUser.email === email) return res.status(400).json({ message: "Email already in use" });
-            if (existingUser.regno === regno) return res.status(400).json({ message: "Registration number already exists" });
+            if (existingUser.rollno === rollno) return res.status(400).json({ message: "Roll number already exists" });
             if (existingUser.mobileno === mobileno) return res.status(400).json({ message: "Mobile number already exists" });
         }
+        
+        // Check if regno already exists (only if provided)
+        if (regno) {
+            const existingRegno = await User.findOne({ regno: regno });
+            if (existingRegno) return res.status(400).json({ message: "Registration number already exists" });
+        }
+        
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
-            name, email, password: hashedPassword, branch, batch, regno, mobileno, isverified: false
+            name, 
+            email, 
+            password: hashedPassword, 
+            branch, 
+            batch, 
+            rollno: rollno,  // ✅ Roll No - COMPULSORY
+            regno: regno || '',  // ✅ Reg No - OPTIONAL
+            mobileno, 
+            isverified: false
         });
+        
         const verificationToken = jwt.sign(
             { email: newUser.email },
             process.env.JWT_SECRET,
@@ -179,6 +202,7 @@ app.post("/login", async (req, res) => {
                 email: user.email,
                 branch: user.branch,
                 batch: user.batch,
+                rollno: user.rollno,
                 regno: user.regno,
                 mobileno: user.mobileno
             },
@@ -343,6 +367,10 @@ app.use('/api', galleryRoutes);
 app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
 
+// ========== CERTIFICATE ROUTES (NEW) ==========
+app.use('/api/certificates', certificateRoutes);
+app.use('/admin/certificates', certificateRoutes);
+
 // ========== NEW TEAM MANAGEMENT ROUTES ==========
 // OTP Login Routes (for all team members including super admin)
 app.use('/api/team', teamAuthRoutes);
@@ -350,8 +378,8 @@ app.use('/api/team', teamAuthRoutes);
 // Team Management Routes (Super Admin only)
 app.use('/api/team', teamManagementRoutes);
 
-// ✅ FIXED: Work Assignment Routes (correct mount point)
-app.use('/api/team/work', workRoutes);  // 👈 YEH LINE CHANGE KARI HAI
+// Work Assignment Routes
+app.use('/api/team/work', workRoutes);
 
 // ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
