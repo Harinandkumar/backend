@@ -366,7 +366,7 @@ app.use('/admin', galleryRoutes);
 app.use('/api', galleryRoutes);
 app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
-
+app.use('/api/team/certificates', certificateRoutes);
 // ========== CERTIFICATE ROUTES (NEW) ==========
 app.use('/api/certificates', certificateRoutes);
 app.use('/admin/certificates', certificateRoutes);
