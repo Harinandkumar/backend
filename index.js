@@ -22,8 +22,12 @@ const workRoutes = require('./admin/work');
 // ========== CERTIFICATE ROUTES ==========
 const certificateRoutes = require('./admin/certificate');
 
+// ========== LOGIN HISTORY ROUTES ==========
+const loginHistoryRoutes = require('./admin/loginHistory');
+
 // ========== SCHEMAS FOR SEEDING ==========
 const TeamMember = require('./schemas/teamMember');
+const LoginHistory = require('./schemas/loginHistory');
 
 require('dotenv').config();
 
@@ -120,17 +124,15 @@ app.get("/api/notifications", async (req, res) => {
     }
 });
 
-// ========== AUTH ROUTES (USER) - UPDATED with rollno ==========
+// ========== AUTH ROUTES (USER) - UPDATED with rollno and login history ==========
 app.post("/signup", async (req, res) => {
     const { name, email, password, branch, batch, rollno, regno, mobileno } = req.body;
     
-    // Roll no is compulsory, regno is optional
     if (!name || !email || !password || !branch || !batch || !rollno || !mobileno) {
-        return res.status(400).json({ message: "All required fields (name, email, password, branch, batch, rollno, mobileno) must be filled" });
+        return res.status(400).json({ message: "All required fields must be filled" });
     }
     
     try {
-        // Check existing user by email, rollno, or mobileno
         const existingUser = await User.findOne({ $or: [{ email }, { rollno }, { mobileno }] });
         if (existingUser) {
             if (existingUser.email === email) return res.status(400).json({ message: "Email already in use" });
@@ -138,7 +140,6 @@ app.post("/signup", async (req, res) => {
             if (existingUser.mobileno === mobileno) return res.status(400).json({ message: "Mobile number already exists" });
         }
         
-        // Check if regno already exists (only if provided)
         if (regno) {
             const existingRegno = await User.findOne({ regno: regno });
             if (existingRegno) return res.status(400).json({ message: "Registration number already exists" });
@@ -146,15 +147,8 @@ app.post("/signup", async (req, res) => {
         
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
-            name, 
-            email, 
-            password: hashedPassword, 
-            branch, 
-            batch, 
-            rollno: rollno,  // ✅ Roll No - COMPULSORY
-            regno: regno || '',  // ✅ Reg No - OPTIONAL
-            mobileno, 
-            isverified: false
+            name, email, password: hashedPassword, branch, batch,
+            rollno: rollno, regno: regno || '', mobileno, isverified: false
         });
         
         const verificationToken = jwt.sign(
@@ -187,12 +181,56 @@ app.post("/login", async (req, res) => {
             await sendVerificationEmail(email, verificationToken);
             return res.status(401).json({ message: "Account not verified. A new verification email has been sent." });
         }
+        
         const token = jwt.sign(
             { userId: user._id, email: user.email, name: user.name },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
         const events = await Event.find({});
+        
+        // ========== SAVE LOGIN HISTORY ==========
+        try {
+            const userAgent = req.headers['user-agent'] || 'Unknown';
+            let device = 'Desktop';
+            let browser = 'Unknown';
+            let os = 'Unknown';
+            
+            if (userAgent.includes('Mobile') || userAgent.includes('Android') || userAgent.includes('iPhone')) {
+                device = 'Mobile';
+            } else if (userAgent.includes('iPad')) {
+                device = 'Tablet';
+            }
+            
+            if (userAgent.includes('Chrome')) browser = 'Chrome';
+            else if (userAgent.includes('Firefox')) browser = 'Firefox';
+            else if (userAgent.includes('Safari')) browser = 'Safari';
+            else if (userAgent.includes('Edge')) browser = 'Edge';
+            
+            if (userAgent.includes('Windows')) os = 'Windows';
+            else if (userAgent.includes('Mac')) os = 'Mac';
+            else if (userAgent.includes('Linux')) os = 'Linux';
+            else if (userAgent.includes('Android')) os = 'Android';
+            else if (userAgent.includes('iPhone') || userAgent.includes('iOS')) os = 'iOS';
+            
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+            
+            await LoginHistory.create({
+                userId: user._id,
+                name: user.name,
+                email: user.email,
+                ipAddress: ipAddress,
+                userAgent: userAgent,
+                device: device,
+                browser: browser,
+                os: os,
+                loginMethod: 'email_password'
+            });
+            console.log('✅ Login history saved for:', user.email);
+        } catch (logError) {
+            console.error('Failed to save login history:', logError);
+        }
+        
         res.status(200).json({
             message: "Login successful",
             token,
@@ -366,19 +404,19 @@ app.use('/admin', galleryRoutes);
 app.use('/api', galleryRoutes);
 app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
+
+// ========== CERTIFICATE ROUTES ==========
 app.use('/api/team/certificates', certificateRoutes);
-// ========== CERTIFICATE ROUTES (NEW) ==========
 app.use('/api/certificates', certificateRoutes);
 app.use('/admin/certificates', certificateRoutes);
 
+// ========== LOGIN HISTORY ROUTES ==========
+app.use('/api/login-history', loginHistoryRoutes);
+app.use('/api/team/login-history', loginHistoryRoutes);
+
 // ========== NEW TEAM MANAGEMENT ROUTES ==========
-// OTP Login Routes (for all team members including super admin)
 app.use('/api/team', teamAuthRoutes);
-
-// Team Management Routes (Super Admin only)
 app.use('/api/team', teamManagementRoutes);
-
-// Work Assignment Routes
 app.use('/api/team/work', workRoutes);
 
 // ========== ADMIN VERIFY ENDPOINT ==========
