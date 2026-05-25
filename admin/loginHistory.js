@@ -2,20 +2,21 @@ const express = require('express');
 const router = express.Router();
 const LoginHistory = require('../schemas/loginHistory');
 const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
+const { userAuth } = require('../middleware/auth');
 
-// ========== USER ROUTES (User dashboard ke liye) ==========
-// Get user's own login history
-router.get('/my', teamAuth, async (req, res) => {
+// ========== USER ROUTES (Normal User ke liye) ==========
+router.get('/my', userAuth, async (req, res) => {
     try {
-        const userId = req.teamMember?.userId || req.user?.userId;
+        const userId = req.user.userId;
         
         if (!userId) {
             return res.status(400).json({ message: 'User ID not found' });
         }
         
-        const history = await LoginHistory.find({ userId: userId })
-            .sort({ loginTime: -1 })
-            .limit(50);
+        const history = await LoginHistory.find({ 
+            userId: userId,
+            userModel: 'User'
+        }).sort({ loginTime: -1 }).limit(100);
         
         res.json(history);
     } catch (error) {
@@ -24,8 +25,24 @@ router.get('/my', teamAuth, async (req, res) => {
     }
 });
 
+// ========== TEAM MEMBER ROUTE ==========
+router.get('/team/my', teamAuth, async (req, res) => {
+    try {
+        const userId = req.teamMember._id;
+        
+        const history = await LoginHistory.find({ 
+            userId: userId,
+            userModel: 'TeamMember'
+        }).sort({ loginTime: -1 }).limit(100);
+        
+        res.json(history);
+    } catch (error) {
+        console.error('Error fetching team login history:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // ========== ADMIN ROUTES (Super Admin only) ==========
-// Get all users' login history (Super Admin only)
 router.get('/all', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { email, startDate, endDate, limit = 100 } = req.query;
@@ -67,7 +84,6 @@ router.get('/all', teamAuth, isSuperAdmin, async (req, res) => {
 // Get login stats (Super Admin only)
 router.get('/stats', teamAuth, isSuperAdmin, async (req, res) => {
     try {
-        // Last 7 days login count
         const last7Days = [];
         for (let i = 6; i >= 0; i--) {
             const date = new Date();
@@ -86,7 +102,6 @@ router.get('/stats', teamAuth, isSuperAdmin, async (req, res) => {
             });
         }
         
-        // Top users by login count
         const topUsers = await LoginHistory.aggregate([
             { $group: { _id: '$email', name: { $first: '$name' }, count: { $sum: 1 } } },
             { $sort: { count: -1 } },
