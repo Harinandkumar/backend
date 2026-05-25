@@ -191,7 +191,7 @@ app.post("/login", async (req, res) => {
         );
         const events = await Event.find({});
         
-        // ========== SAVE LOGIN HISTORY ==========
+        // ========== SAVE LOGIN HISTORY - FIXED with userModel ==========
         try {
             const userAgent = req.headers['user-agent'] || 'Unknown';
             let device = 'Desktop';
@@ -219,6 +219,7 @@ app.post("/login", async (req, res) => {
             
             await LoginHistory.create({
                 userId: user._id,
+                userModel: 'User',
                 name: user.name,
                 email: user.email,
                 ipAddress: ipAddress,
@@ -226,7 +227,8 @@ app.post("/login", async (req, res) => {
                 device: device,
                 browser: browser,
                 os: os,
-                loginMethod: 'email_password'
+                loginMethod: 'email_password',
+                status: 'success'
             });
             console.log('✅ Login history saved for:', user.email);
         } catch (logError) {
@@ -422,6 +424,7 @@ app.use('/api/team', teamManagementRoutes);
 app.use('/api/team/work', workRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/team/activity-logs', activityLogRoutes);
+
 // ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
