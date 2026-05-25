@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const TeamMember = require('../schemas/teamMember');
 const { sendOTP, verifyOTP } = require('../services/otpService');
 const LoginHistory = require('../schemas/loginHistory');
-const { logAdminAction, generateSessionId } = require('../middleware/logActivity');
 
 const getDeviceInfo = (userAgent) => {
     let device = 'Desktop';
@@ -31,6 +30,40 @@ const getDeviceInfo = (userAgent) => {
     }
     
     return { device, browser, os };
+};
+
+const generateSessionId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+// Simple function to log admin action WITHOUT requiring req.teamMember
+const logAdminActionSimple = async (adminData, action, options = {}) => {
+    try {
+        const AdminActivityLog = require('../schemas/adminActivityLog');
+        await AdminActivityLog.create({
+            adminId: adminData._id,
+            adminName: adminData.name,
+            adminEmail: adminData.email,
+            adminRole: adminData.role,
+            action: action,
+            actionDetails: options.details || {},
+            targetId: options.targetId || null,
+            targetModel: options.targetModel || null,
+            targetName: options.targetName || null,
+            ipAddress: options.ipAddress || 'Unknown',
+            userAgent: options.userAgent || 'Unknown',
+            device: options.device || 'Desktop',
+            browser: options.browser || 'Unknown',
+            os: options.os || 'Unknown',
+            status: options.status || 'success',
+            errorMessage: options.errorMessage || null,
+            sessionId: options.sessionId || null
+        });
+        return true;
+    } catch (logError) {
+        console.error('Failed to log admin action:', logError);
+        return false;
+    }
 };
 
 router.post('/send-otp', async (req, res) => {
@@ -83,6 +116,7 @@ router.post('/verify-otp', async (req, res) => {
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
         const sessionId = generateSessionId();
         
+        // Save login history
         try {
             await LoginHistory.create({
                 userId: member._id,
@@ -103,10 +137,21 @@ router.post('/verify-otp', async (req, res) => {
             console.error('Failed to save login history:', logError);
         }
         
-        await logAdminAction(req, 'admin_login', {
-            details: { method: 'otp', sessionId: sessionId },
-            sessionId: sessionId
-        });
+        // Log admin action - FIXED: Pass member data directly, not req
+        try {
+            await logAdminActionSimple(member, 'admin_login', {
+                details: { method: 'otp', sessionId: sessionId },
+                ipAddress: ipAddress,
+                userAgent: userAgent,
+                device: device,
+                browser: browser,
+                os: os,
+                sessionId: sessionId
+            });
+            console.log('✅ Admin login activity logged for:', member.email);
+        } catch (logError) {
+            console.error('Failed to log admin activity:', logError);
+        }
         
         member.lastLogin = new Date();
         await member.save();
@@ -131,8 +176,8 @@ router.post('/verify-otp', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('OTP verification error:', error);
+        res.status(500).json({ message: 'Server error: ' + error.message });
     }
 });
 
@@ -177,13 +222,14 @@ router.post('/logout', async (req, res) => {
                         { logoutTime: new Date() }
                     );
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error('Token decode error:', e);
+            }
         }
-        
-        await logAdminAction(req, 'admin_logout', { details: { sessionId: sessionId } });
         
         res.json({ message: 'Logged out successfully' });
     } catch (error) {
+        console.error('Logout error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
