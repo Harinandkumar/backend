@@ -7,10 +7,8 @@ const Category = require('../schemas/category');
 const NavItem = require('../schemas/navItem');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
 const { sendWelcomeEmailToNewMember } = require('../mailer');
+const { logAdminAction } = require('../middleware/logActivity');
 
-// ========== TEAM MEMBERS MANAGEMENT ==========
-
-// Get all team members (Super Admin only)
 router.get('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const members = await TeamMember.find({}).select('-__v').sort({ createdAt: -1 });
@@ -21,7 +19,6 @@ router.get('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Get single team member by ID (for permissions modal)
 router.get('/team-member/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.params.id).select('-__v');
@@ -35,7 +32,6 @@ router.get('/team-member/:id', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Add new team member (Super Admin only) - WITH WELCOME EMAIL
 router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, email, position, role, phone, profileImage, permissions } = req.body;
@@ -111,11 +107,18 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
         
         await member.save();
         
+        await logAdminAction(req, 'team_member_added', {
+            targetId: member._id,
+            targetModel: 'TeamMember',
+            targetName: member.name,
+            details: { name: member.name, email: member.email, role: member.role }
+        });
+        
         try {
             await sendWelcomeEmailToNewMember(email, name, role, finalPermissions, req.teamMember.name);
-            console.log('✅ Welcome email sent to:', email);
+            console.log('Welcome email sent to:', email);
         } catch (emailError) {
-            console.error('⚠️ Member added but email failed:', emailError.message);
+            console.error('Member added but email failed:', emailError.message);
         }
         
         res.status(201).json({ message: 'Team member added successfully. Welcome email sent!', member });
@@ -125,7 +128,6 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Update team member (Super Admin only)
 router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const { name, position, role, phone, profileImage, isActive, permissions } = req.body;
@@ -134,6 +136,8 @@ router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
         if (!member) {
             return res.status(404).json({ message: 'Team member not found' });
         }
+        
+        const oldData = { name: member.name, role: member.role, isActive: member.isActive };
         
         if (name) member.name = name;
         if (position) member.position = position;
@@ -144,6 +148,14 @@ router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
         if (permissions) member.permissions = permissions;
         
         await member.save();
+        
+        await logAdminAction(req, 'team_member_updated', {
+            targetId: member._id,
+            targetModel: 'TeamMember',
+            targetName: member.name,
+            details: { old: oldData, new: { name: member.name, role: member.role, isActive: member.isActive } }
+        });
+        
         res.json({ message: 'Member updated successfully', member });
     } catch (error) {
         console.error('Error updating team member:', error);
@@ -151,7 +163,6 @@ router.put('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Delete team member (Super Admin only)
 router.delete('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.params.id);
@@ -163,6 +174,13 @@ router.delete('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
             return res.status(400).json({ message: 'You cannot delete yourself' });
         }
         
+        await logAdminAction(req, 'team_member_deleted', {
+            targetId: member._id,
+            targetModel: 'TeamMember',
+            targetName: member.name,
+            details: { name: member.name, email: member.email, role: member.role }
+        });
+        
         await TeamMember.findByIdAndDelete(req.params.id);
         res.json({ message: 'Team member deleted successfully' });
     } catch (error) {
@@ -171,7 +189,32 @@ router.delete('/team-members/:id', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Get current team member profile
+router.put('/team-members/:id/permissions', teamAuth, isSuperAdmin, async (req, res) => {
+    try {
+        const { permissions } = req.body;
+        const member = await TeamMember.findById(req.params.id);
+        
+        if (!member) {
+            return res.status(404).json({ message: 'Team member not found' });
+        }
+        
+        member.permissions = permissions;
+        await member.save();
+        
+        await logAdminAction(req, 'permission_updated', {
+            targetId: member._id,
+            targetModel: 'TeamMember',
+            targetName: member.name,
+            details: { permissions: permissions }
+        });
+        
+        res.json({ message: 'Permissions updated successfully', member });
+    } catch (error) {
+        console.error('Error updating permissions:', error);
+        res.status(400).json({ message: error.message });
+    }
+});
+
 router.get('/me', teamAuth, async (req, res) => {
     try {
         const member = await TeamMember.findById(req.teamMember._id).select('-__v');
@@ -180,8 +223,6 @@ router.get('/me', teamAuth, async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
-
-// ========== USERS (REGULAR MEMBERS) MANAGEMENT ==========
 
 router.get('/users', teamAuth, hasPermission('members', 'view'), async (req, res) => {
     try {
@@ -205,18 +246,25 @@ router.get('/users', teamAuth, hasPermission('members', 'view'), async (req, res
 
 router.delete('/users/:id', teamAuth, hasPermission('members', 'delete'), async (req, res) => {
     try {
-        const user = await User.findByIdAndDelete(req.params.id);
+        const user = await User.findById(req.params.id);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
+        
+        await logAdminAction(req, 'member_deleted', {
+            targetId: user._id,
+            targetModel: 'User',
+            targetName: user.name,
+            details: { name: user.name, email: user.email, rollno: user.rollno }
+        });
+        
+        await User.findByIdAndDelete(req.params.id);
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ message: error.message });
     }
 });
-
-// ========== EVENTS MANAGEMENT ==========
 
 router.get('/events', teamAuth, async (req, res) => {
     try {
@@ -238,6 +286,14 @@ router.post('/events/create', teamAuth, hasPermission('events', 'create'), async
             isOpen: isOpen !== undefined ? isOpen : true, participants: [], participantsCount: 0
         });
         await event.save();
+        
+        await logAdminAction(req, 'event_created', {
+            targetId: event._id,
+            targetModel: 'Event',
+            targetName: event.name,
+            details: { name: event.name, date: event.date, location: event.location, prize: event.prize }
+        });
+        
         res.status(201).json({ message: "Event created successfully", event });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -246,8 +302,18 @@ router.post('/events/create', teamAuth, hasPermission('events', 'create'), async
 
 router.put('/events/:id', teamAuth, hasPermission('events', 'edit'), async (req, res) => {
     try {
+        const oldEvent = await Event.findById(req.params.id);
+        if (!oldEvent) return res.status(404).json({ message: 'Event not found' });
+        
         const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!event) return res.status(404).json({ message: 'Event not found' });
+        
+        await logAdminAction(req, 'event_updated', {
+            targetId: event._id,
+            targetModel: 'Event',
+            targetName: event.name,
+            details: { old: { name: oldEvent.name, isOpen: oldEvent.isOpen }, new: { name: event.name, isOpen: event.isOpen } }
+        });
+        
         res.json({ message: "Event updated successfully", event });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -258,6 +324,14 @@ router.delete('/events/:id', teamAuth, hasPermission('events', 'delete'), async 
     try {
         const event = await Event.findById(req.params.id);
         if (!event) return res.status(404).json({ message: 'Event not found' });
+        
+        await logAdminAction(req, 'event_deleted', {
+            targetId: event._id,
+            targetModel: 'Event',
+            targetName: event.name,
+            details: { name: event.name, date: event.date }
+        });
+        
         await User.updateMany({ 'events.eventId': event._id }, { $pull: { events: { eventId: event._id } } });
         await Event.findByIdAndDelete(req.params.id);
         res.json({ message: 'Event deleted successfully' });
@@ -265,8 +339,6 @@ router.delete('/events/:id', teamAuth, hasPermission('events', 'delete'), async 
         res.status(500).json({ message: error.message });
     }
 });
-
-// ========== NOTIFICATIONS MANAGEMENT ==========
 
 router.get('/notifications', teamAuth, async (req, res) => {
     try {
@@ -287,6 +359,14 @@ router.post('/notifications/create', teamAuth, hasPermission('notifications', 'c
             button2Text: button2Text || '', button2Link: button2Link || ''
         });
         await notification.save();
+        
+        await logAdminAction(req, 'notification_created', {
+            targetId: notification._id,
+            targetModel: 'Notification',
+            targetName: notification.title,
+            details: { title: notification.title, isPriority: notification.isPriority, badge: notification.badge }
+        });
+        
         res.status(201).json({ message: "Notification created successfully", notification });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -295,15 +375,22 @@ router.post('/notifications/create', teamAuth, hasPermission('notifications', 'c
 
 router.delete('/notifications/:id', teamAuth, hasPermission('notifications', 'delete'), async (req, res) => {
     try {
-        const notification = await Notification.findByIdAndDelete(req.params.id);
+        const notification = await Notification.findById(req.params.id);
         if (!notification) return res.status(404).json({ message: 'Notification not found' });
+        
+        await logAdminAction(req, 'notification_deleted', {
+            targetId: notification._id,
+            targetModel: 'Notification',
+            targetName: notification.title,
+            details: { title: notification.title }
+        });
+        
+        await Notification.findByIdAndDelete(req.params.id);
         res.json({ message: 'Notification deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
-
-// ========== GALLERY MANAGEMENT ==========
 
 router.get('/gallery', teamAuth, async (req, res) => {
     try {
@@ -324,6 +411,14 @@ router.post('/gallery/upload', teamAuth, hasPermission('gallery', 'upload'), upl
             width: req.file.width, height: req.file.height
         });
         await galleryImage.save();
+        
+        await logAdminAction(req, 'image_uploaded', {
+            targetId: galleryImage._id,
+            targetModel: 'Gallery',
+            targetName: galleryImage.title,
+            details: { title: galleryImage.title, category: galleryImage.category, size: galleryImage.size }
+        });
+        
         res.status(201).json({ message: 'Image uploaded successfully', image: galleryImage });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -333,8 +428,18 @@ router.post('/gallery/upload', teamAuth, hasPermission('gallery', 'upload'), upl
 router.put('/gallery/:id', teamAuth, hasPermission('gallery', 'upload'), async (req, res) => {
     try {
         const { title, category } = req.body;
+        const oldImage = await Gallery.findById(req.params.id);
+        if (!oldImage) return res.status(404).json({ message: 'Image not found' });
+        
         const image = await Gallery.findByIdAndUpdate(req.params.id, { title, category }, { new: true });
-        if (!image) return res.status(404).json({ message: 'Image not found' });
+        
+        await logAdminAction(req, 'image_updated', {
+            targetId: image._id,
+            targetModel: 'Gallery',
+            targetName: image.title,
+            details: { old: { title: oldImage.title, category: oldImage.category }, new: { title: title, category: category } }
+        });
+        
         res.json({ message: 'Image updated successfully', image });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -345,6 +450,14 @@ router.delete('/gallery/:id', teamAuth, hasPermission('gallery', 'delete'), asyn
     try {
         const image = await Gallery.findById(req.params.id);
         if (!image) return res.status(404).json({ message: 'Image not found' });
+        
+        await logAdminAction(req, 'image_deleted', {
+            targetId: image._id,
+            targetModel: 'Gallery',
+            targetName: image.title,
+            details: { title: image.title, category: image.category }
+        });
+        
         const { cloudinary } = require('../config/cloudinary');
         await cloudinary.uploader.destroy(image.publicId);
         await Gallery.findByIdAndDelete(req.params.id);
@@ -353,8 +466,6 @@ router.delete('/gallery/:id', teamAuth, hasPermission('gallery', 'delete'), asyn
         res.status(500).json({ message: error.message });
     }
 });
-
-// ========== CATEGORIES MANAGEMENT ==========
 
 router.get('/categories', teamAuth, async (req, res) => {
     try {
@@ -373,6 +484,14 @@ router.post('/categories', teamAuth, hasPermission('categories', 'create'), asyn
         if (existing) return res.status(400).json({ message: 'Category already exists' });
         const category = new Category({ name, icon, color });
         await category.save();
+        
+        await logAdminAction(req, 'category_created', {
+            targetId: category._id,
+            targetModel: 'Category',
+            targetName: category.name,
+            details: { name: category.name, icon: category.icon, color: category.color }
+        });
+        
         res.status(201).json({ message: 'Category created', category });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -382,8 +501,18 @@ router.post('/categories', teamAuth, hasPermission('categories', 'create'), asyn
 router.put('/categories/:id', teamAuth, hasPermission('categories', 'edit'), async (req, res) => {
     try {
         const { name, icon, color, isActive } = req.body;
+        const oldCategory = await Category.findById(req.params.id);
+        if (!oldCategory) return res.status(404).json({ message: 'Category not found' });
+        
         const category = await Category.findByIdAndUpdate(req.params.id, { name, icon, color, isActive }, { new: true });
-        if (!category) return res.status(404).json({ message: 'Category not found' });
+        
+        await logAdminAction(req, 'category_updated', {
+            targetId: category._id,
+            targetModel: 'Category',
+            targetName: category.name,
+            details: { old: { name: oldCategory.name }, new: { name: name, isActive: isActive } }
+        });
+        
         res.json({ message: 'Category updated', category });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -394,18 +523,25 @@ router.delete('/categories/:id', teamAuth, hasPermission('categories', 'delete')
     try {
         const category = await Category.findById(req.params.id);
         if (!category) return res.status(404).json({ message: 'Category not found' });
+        
         const imagesUsing = await Gallery.countDocuments({ category: category.name });
         if (imagesUsing > 0) {
             return res.status(400).json({ message: `Cannot delete: ${imagesUsing} images are using this category` });
         }
+        
+        await logAdminAction(req, 'category_deleted', {
+            targetId: category._id,
+            targetModel: 'Category',
+            targetName: category.name,
+            details: { name: category.name }
+        });
+        
         await Category.findByIdAndDelete(req.params.id);
         res.json({ message: 'Category deleted' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
-
-// ========== NAVIGATION ITEMS MANAGEMENT ==========
 
 router.get('/nav-items', teamAuth, async (req, res) => {
     try {
@@ -426,6 +562,14 @@ router.post('/nav-items', teamAuth, hasPermission('navItems', 'create'), async (
             target: target || '_self', order: count
         });
         await navItem.save();
+        
+        await logAdminAction(req, 'nav_created', {
+            targetId: navItem._id,
+            targetModel: 'NavItem',
+            targetName: navItem.name,
+            details: { name: navItem.name, link: navItem.link, badge: navItem.badge }
+        });
+        
         res.status(201).json({ message: 'Nav item created successfully', navItem });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -435,8 +579,18 @@ router.post('/nav-items', teamAuth, hasPermission('navItems', 'create'), async (
 router.put('/nav-items/:id', teamAuth, hasPermission('navItems', 'edit'), async (req, res) => {
     try {
         const { name, link, icon, badge, target, isActive } = req.body;
+        const oldItem = await NavItem.findById(req.params.id);
+        if (!oldItem) return res.status(404).json({ message: 'Nav item not found' });
+        
         const item = await NavItem.findByIdAndUpdate(req.params.id, { name, link, icon, badge, target, isActive }, { new: true });
-        if (!item) return res.status(404).json({ message: 'Nav item not found' });
+        
+        await logAdminAction(req, 'nav_updated', {
+            targetId: item._id,
+            targetModel: 'NavItem',
+            targetName: item.name,
+            details: { old: { name: oldItem.name }, new: { name: name, isActive: isActive } }
+        });
+        
         res.json({ message: 'Nav item updated successfully', item });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -445,8 +599,17 @@ router.put('/nav-items/:id', teamAuth, hasPermission('navItems', 'edit'), async 
 
 router.delete('/nav-items/:id', teamAuth, hasPermission('navItems', 'delete'), async (req, res) => {
     try {
-        const item = await NavItem.findByIdAndDelete(req.params.id);
+        const item = await NavItem.findById(req.params.id);
         if (!item) return res.status(404).json({ message: 'Nav item not found' });
+        
+        await logAdminAction(req, 'nav_deleted', {
+            targetId: item._id,
+            targetModel: 'NavItem',
+            targetName: item.name,
+            details: { name: item.name, link: item.link }
+        });
+        
+        await NavItem.findByIdAndDelete(req.params.id);
         res.json({ message: 'Nav item deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -459,6 +622,11 @@ router.put('/nav-items/reorder', teamAuth, hasPermission('navItems', 'edit'), as
         for (let i = 0; i < items.length; i++) {
             await NavItem.findByIdAndUpdate(items[i]._id, { order: i });
         }
+        
+        await logAdminAction(req, 'nav_reordered', {
+            details: { itemCount: items.length }
+        });
+        
         res.json({ message: 'Order updated successfully' });
     } catch (error) {
         res.status(400).json({ message: error.message });

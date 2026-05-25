@@ -13,6 +13,8 @@ const notificationRoutes = require('./admin/notification');
 const navRoutes = require('./admin/nav');
 const galleryRoutes = require('./admin/gallery');
 const categoryRoutes = require('./admin/category');
+const activityLogRoutes = require('./admin/activityLog');
+
 
 // ========== NEW TEAM MANAGEMENT ROUTES ==========
 const teamAuthRoutes = require('./admin/team-auth');
@@ -418,7 +420,8 @@ app.use('/api/team/login-history', loginHistoryRoutes);
 app.use('/api/team', teamAuthRoutes);
 app.use('/api/team', teamManagementRoutes);
 app.use('/api/team/work', workRoutes);
-
+app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/team/activity-logs', activityLogRoutes);
 // ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
