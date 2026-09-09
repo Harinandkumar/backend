@@ -49,7 +49,7 @@ app.use(express.urlencoded({ extended: true }));
 // ========== CONNECT DATABASE ==========
 dbconnect();
 
-// ========== SEED SUPER ADMIN (Run once) ==========
+// ========== SEED SUPER ADMIN ==========
 const seedSuperAdmin = async () => {
     try {
         const existingSuperAdmin = await TeamMember.findOne({ role: 'super_admin' });
@@ -126,7 +126,7 @@ app.get("/api/notifications", async (req, res) => {
     }
 });
 
-// ========== AUTH ROUTES (USER) - UPDATED with rollno and login history ==========
+// ========== AUTH ROUTES (USER) ==========
 app.post("/signup", async (req, res) => {
     const { name, email, password, branch, batch, rollno, regno, mobileno } = req.body;
     
@@ -191,7 +191,7 @@ app.post("/login", async (req, res) => {
         );
         const events = await Event.find({});
         
-        // ========== SAVE LOGIN HISTORY - FIXED with userModel ==========
+        // Save login history
         try {
             const userAgent = req.headers['user-agent'] || 'Unknown';
             let device = 'Desktop';
@@ -424,8 +424,11 @@ app.use('/api/team', teamManagementRoutes);
 app.use('/api/team/work', workRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/team/activity-logs', activityLogRoutes);
+
+// ========== TEAM PUBLIC ROUTES ==========
 app.use('/api/team', teamPublicRoutes); // Admin routes
 app.use('/api', teamPublicRoutes);      // Public route: /api/public/team
+
 // ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];

@@ -8,7 +8,7 @@ const teamPublicSchema = new mongoose.Schema({
     },
     position: { 
         type: String, 
-        enum: ['Core Member', 'Coordinator', 'Sub-Coordinator'],
+        enum: ['Senior Coordinator', 'Coordinator', 'Sub-Coordinator'],
         required: true 
     },
     batch: { 
@@ -47,7 +47,7 @@ const teamPublicSchema = new mongoose.Schema({
     }
 });
 
-// Index for faster queries
+// Indexes for faster queries
 teamPublicSchema.index({ position: 1, order: 1 });
 teamPublicSchema.index({ isActive: 1 });
 

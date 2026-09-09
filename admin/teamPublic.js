@@ -155,7 +155,7 @@ router.get('/public/team', async (req, res) => {
         
         // Group by position
         const grouped = {
-            core_members: members.filter(m => m.position === 'Core Member'),
+            senior_coordinators: members.filter(m => m.position === 'Senior Coordinator'),
             coordinators: members.filter(m => m.position === 'Coordinator'),
             sub_coordinators: members.filter(m => m.position === 'Sub-Coordinator')
         };
