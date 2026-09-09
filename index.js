@@ -21,9 +21,9 @@ const teamAuthRoutes = require('./admin/team-auth');
 const teamManagementRoutes = require('./admin/team');
 const workRoutes = require('./admin/work');
 const alumniRoutes = require('./admin/alumni');
-
 // ========== CERTIFICATE ROUTES ==========
 const certificateRoutes = require('./admin/certificate');
+const formBuilderRoutes = require('./admin/formBuilder');
 
 // ========== LOGIN HISTORY ROUTES ==========
 const loginHistoryRoutes = require('./admin/loginHistory');
@@ -409,6 +409,8 @@ app.use('/admin', galleryRoutes);
 app.use('/api', galleryRoutes);
 app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
+app.use('/api', formBuilderRoutes);
+
 
 // ========== CERTIFICATE ROUTES ==========
 app.use('/api/team/certificates', certificateRoutes);
