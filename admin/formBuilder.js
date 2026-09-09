@@ -3,7 +3,6 @@ const router = express.Router();
 const FormBuilder = require('../schemas/formBuilder');
 const FormResponse = require('../schemas/formResponse');
 const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
-const { upload } = require('../config/cloudinary');
 
 // ========== ADMIN ROUTES ==========
 
@@ -31,25 +30,20 @@ router.get('/forms/:id', teamAuth, isSuperAdmin, async (req, res) => {
 // Create form
 router.post('/forms', teamAuth, isSuperAdmin, async (req, res) => {
     try {
-        const { title, description, eventId, fields, theme, password, expiryDate, maxSubmissions, uniqueResponse, sendEmailReceipt, confirmationMessage, redirectUrl } = req.body;
+        const { title, description, fields, expiryDate, maxSubmissions, password, sendEmailReceipt, googleSheetsSync } = req.body;
         
-        if (!title) {
-            return res.status(400).json({ message: 'Title is required' });
-        }
+        if (!title) return res.status(400).json({ message: 'Title is required' });
+        if (!fields || fields.length === 0) return res.status(400).json({ message: 'At least one field is required' });
         
         const form = new FormBuilder({
             title,
             description: description || '',
-            eventId: eventId || null,
-            fields: fields || [],
-            theme: theme || 'default',
-            password: password || '',
+            fields,
             expiryDate: expiryDate || null,
             maxSubmissions: maxSubmissions || null,
-            uniqueResponse: uniqueResponse || false,
+            password: password || '',
             sendEmailReceipt: sendEmailReceipt || false,
-            confirmationMessage: confirmationMessage || 'Thank you for your submission!',
-            redirectUrl: redirectUrl || '',
+            googleSheetsSync: googleSheetsSync || false,
             isPublished: false,
             isActive: true
         });
@@ -64,7 +58,7 @@ router.post('/forms', teamAuth, isSuperAdmin, async (req, res) => {
 // Update form
 router.put('/forms/:id', teamAuth, isSuperAdmin, async (req, res) => {
     try {
-        const { title, description, fields, theme, password, expiryDate, maxSubmissions, uniqueResponse, sendEmailReceipt, confirmationMessage, redirectUrl, isActive, isPublished } = req.body;
+        const { title, description, fields, expiryDate, maxSubmissions, password, sendEmailReceipt, googleSheetsSync, isPublished, isActive } = req.body;
         
         const form = await FormBuilder.findById(req.params.id);
         if (!form) return res.status(404).json({ message: 'Form not found' });
@@ -72,16 +66,13 @@ router.put('/forms/:id', teamAuth, isSuperAdmin, async (req, res) => {
         if (title) form.title = title;
         if (description !== undefined) form.description = description;
         if (fields) form.fields = fields;
-        if (theme) form.theme = theme;
-        if (password !== undefined) form.password = password;
         if (expiryDate !== undefined) form.expiryDate = expiryDate;
         if (maxSubmissions !== undefined) form.maxSubmissions = maxSubmissions;
-        if (uniqueResponse !== undefined) form.uniqueResponse = uniqueResponse;
+        if (password !== undefined) form.password = password;
         if (sendEmailReceipt !== undefined) form.sendEmailReceipt = sendEmailReceipt;
-        if (confirmationMessage) form.confirmationMessage = confirmationMessage;
-        if (redirectUrl !== undefined) form.redirectUrl = redirectUrl;
-        if (isActive !== undefined) form.isActive = isActive;
+        if (googleSheetsSync !== undefined) form.googleSheetsSync = googleSheetsSync;
         if (isPublished !== undefined) form.isPublished = isPublished;
+        if (isActive !== undefined) form.isActive = isActive;
         form.updatedAt = new Date();
         
         await form.save();
@@ -106,34 +97,23 @@ router.delete('/forms/:id', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
+// ========== RESPONSES ROUTES ==========
+
 // Get form responses
 router.get('/forms/:id/responses', teamAuth, isSuperAdmin, async (req, res) => {
     try {
-        const { page = 1, limit = 50, search = '' } = req.query;
+        const { page = 1, limit = 50 } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         
-        let query = { formId: req.params.id };
-        if (search) {
-            query.$or = [
-                { email: { $regex: search, $options: 'i' } },
-                { 'responses': { $regex: search, $options: 'i' } }
-            ];
-        }
-        
         const [responses, total] = await Promise.all([
-            FormResponse.find(query)
+            FormResponse.find({ formId: req.params.id })
                 .sort({ submittedAt: -1 })
                 .skip(skip)
                 .limit(parseInt(limit)),
-            FormResponse.countDocuments(query)
+            FormResponse.countDocuments({ formId: req.params.id })
         ]);
         
-        res.json({ 
-            responses, 
-            total, 
-            page: parseInt(page), 
-            pages: Math.ceil(total / parseInt(limit)) 
-        });
+        res.json({ responses, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -145,6 +125,13 @@ router.get('/forms/:id/stats', teamAuth, isSuperAdmin, async (req, res) => {
         const totalResponses = await FormResponse.countDocuments({ formId: req.params.id });
         const completedResponses = await FormResponse.countDocuments({ formId: req.params.id, isPartial: false });
         const partialResponses = await FormResponse.countDocuments({ formId: req.params.id, isPartial: true });
+        
+        // Calculate average time
+        const avgTimeResult = await FormResponse.aggregate([
+            { $match: { formId: req.params.id } },
+            { $group: { _id: null, avg: { $avg: '$completionTime' } } }
+        ]);
+        const avgTime = avgTimeResult.length > 0 ? Math.round(avgTimeResult[0].avg) : 0;
         
         // Daily stats for last 7 days
         const dailyStats = [];
@@ -166,7 +153,7 @@ router.get('/forms/:id/stats', teamAuth, isSuperAdmin, async (req, res) => {
             });
         }
         
-        res.json({ totalResponses, completedResponses, partialResponses, dailyStats });
+        res.json({ totalResponses, completedResponses, partialResponses, avgTime, dailyStats });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -238,7 +225,7 @@ router.get('/public/forms/:id', async (req, res) => {
 });
 
 // Submit form response
-router.post('/public/forms/:id/submit', upload.any(), async (req, res) => {
+router.post('/public/forms/:id/submit', async (req, res) => {
     try {
         const form = await FormBuilder.findOne({
             _id: req.params.id,
@@ -264,43 +251,27 @@ router.post('/public/forms/:id/submit', upload.any(), async (req, res) => {
         const { responses, email, userId } = req.body;
         const parsedResponses = typeof responses === 'string' ? JSON.parse(responses) : responses;
         
-        // Check unique response
-        if (form.uniqueResponse && userId) {
-            const existing = await FormResponse.findOne({ formId: form._id, userId });
-            if (existing) {
-                return res.status(400).json({ message: 'You have already submitted this form' });
-            }
-        }
-        
-        // Process file uploads
-        const processedResponses = { ...parsedResponses };
-        if (req.files && req.files.length > 0) {
-            req.files.forEach(file => {
-                processedResponses[file.fieldname] = file.path;
-            });
+        // Check password
+        if (form.password && form.password !== req.body.password) {
+            return res.status(401).json({ message: 'Invalid password' });
         }
         
         const response = new FormResponse({
             formId: form._id,
             userId: userId || null,
             email: email || '',
-            responses: processedResponses,
+            responses: parsedResponses,
             ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown',
             userAgent: req.headers['user-agent'] || 'Unknown',
-            isPartial: false
+            isPartial: false,
+            completionTime: req.body.completionTime || 0
         });
         
         await response.save();
         
-        // Send email receipt if enabled
-        if (form.sendEmailReceipt && email) {
-            // Email logic here
-        }
-        
-        res.status(201).json({ 
+        res.status(201).json({
             message: 'Form submitted successfully',
-            confirmationMessage: form.confirmationMessage,
-            redirectUrl: form.redirectUrl
+            confirmationMessage: 'Thank you for your submission!'
         });
     } catch (error) {
         res.status(400).json({ message: error.message });

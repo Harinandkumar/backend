@@ -56,7 +56,7 @@ const seedSuperAdmin = async () => {
         const existingSuperAdmin = await TeamMember.findOne({ role: 'super_admin' });
         if (!existingSuperAdmin) {
             const superAdmin = new TeamMember({
-                name: 'Super Admin',
+                name: 'harinand',
                 email: 'creativecodingcommunity.cs@gmail.com',
                 position: 'Super Admin',
                 role: 'super_admin',
