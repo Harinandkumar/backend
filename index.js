@@ -20,6 +20,7 @@ const teamPublicRoutes = require('./admin/teamPublic');
 const teamAuthRoutes = require('./admin/team-auth');
 const teamManagementRoutes = require('./admin/team');
 const workRoutes = require('./admin/work');
+const alumniRoutes = require('./admin/alumni');
 
 // ========== CERTIFICATE ROUTES ==========
 const certificateRoutes = require('./admin/certificate');
@@ -428,7 +429,8 @@ app.use('/api/team/activity-logs', activityLogRoutes);
 // ========== TEAM PUBLIC ROUTES ==========
 app.use('/api/team', teamPublicRoutes); // Admin routes
 app.use('/api', teamPublicRoutes);      // Public route: /api/public/team
-
+app.use('/api/team', alumniRoutes); // Admin routes
+app.use('/api', alumniRoutes);      // Public route: /api/public/alumni
 // ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
