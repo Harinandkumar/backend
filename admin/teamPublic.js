@@ -22,7 +22,6 @@ router.post('/team-public', teamAuth, isSuperAdmin, upload.single('photo'), asyn
     try {
         const { name, position, batch, linkedin } = req.body;
         
-        // Validation
         if (!name || !position || !batch) {
             return res.status(400).json({ message: 'Name, position, and batch are required' });
         }
@@ -31,7 +30,6 @@ router.post('/team-public', teamAuth, isSuperAdmin, upload.single('photo'), asyn
             return res.status(400).json({ message: 'Photo is required' });
         }
         
-        // Get count for ordering
         const count = await TeamPublic.countDocuments();
         
         const member = new TeamPublic({
@@ -66,7 +64,6 @@ router.put('/team-public/:id', teamAuth, isSuperAdmin, upload.single('photo'), a
             return res.status(404).json({ message: 'Member not found' });
         }
         
-        // Update fields
         if (name) member.name = name.trim();
         if (position) member.position = position;
         if (batch) member.batch = batch.trim();
@@ -74,9 +71,7 @@ router.put('/team-public/:id', teamAuth, isSuperAdmin, upload.single('photo'), a
         if (isActive !== undefined) member.isActive = isActive;
         member.updatedAt = new Date();
         
-        // Update photo if new file uploaded
         if (req.file) {
-            // Delete old image from Cloudinary
             const { cloudinary } = require('../config/cloudinary');
             try {
                 await cloudinary.uploader.destroy(member.publicId);
@@ -107,7 +102,6 @@ router.delete('/team-public/:id', teamAuth, isSuperAdmin, async (req, res) => {
             return res.status(404).json({ message: 'Member not found' });
         }
         
-        // Delete image from Cloudinary
         const { cloudinary } = require('../config/cloudinary');
         try {
             await cloudinary.uploader.destroy(member.publicId);
@@ -155,9 +149,11 @@ router.get('/public/team', async (req, res) => {
         
         // Group by position
         const grouped = {
+            founding_members: members.filter(m => m.position === 'Founding Member'),
             senior_coordinators: members.filter(m => m.position === 'Senior Coordinator'),
             coordinators: members.filter(m => m.position === 'Coordinator'),
-            sub_coordinators: members.filter(m => m.position === 'Sub-Coordinator')
+            sub_coordinators: members.filter(m => m.position === 'Sub-Coordinator'),
+            volunteers: members.filter(m => m.position === 'Volunteer')
         };
         
         res.json(grouped);
