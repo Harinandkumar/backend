@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TeamPublic = require('../schemas/teamPublic');
 const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
-const { upload } = require('../config/cloudinary');
+const { uploadTeam } = require('../config/cloudinary');  // ✅ Changed
 
 // ========== ADMIN ROUTES (Super Admin only) ==========
 
@@ -18,7 +18,7 @@ router.get('/team-public', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Add team member
-router.post('/team-public', teamAuth, isSuperAdmin, upload.single('photo'), async (req, res) => {
+router.post('/team-public', teamAuth, isSuperAdmin, uploadTeam.single('photo'), async (req, res) => {  // ✅ Changed
     try {
         const { name, position, batch, linkedin } = req.body;
         
@@ -55,7 +55,7 @@ router.post('/team-public', teamAuth, isSuperAdmin, upload.single('photo'), asyn
 });
 
 // Update team member
-router.put('/team-public/:id', teamAuth, isSuperAdmin, upload.single('photo'), async (req, res) => {
+router.put('/team-public/:id', teamAuth, isSuperAdmin, uploadTeam.single('photo'), async (req, res) => {  // ✅ Changed
     try {
         const { name, position, batch, linkedin, isActive } = req.body;
         const member = await TeamPublic.findById(req.params.id);
@@ -147,7 +147,6 @@ router.get('/public/team', async (req, res) => {
             .sort({ order: 1, createdAt: -1 })
             .select('-publicId -__v');
         
-        // Group by position
         const grouped = {
             founding_members: members.filter(m => m.position === 'Founding Member'),
             senior_coordinators: members.filter(m => m.position === 'Senior Coordinator'),

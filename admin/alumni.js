@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Alumni = require('../schemas/alumni');
 const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
-const { upload } = require('../config/cloudinary');
+const { uploadAlumni } = require('../config/cloudinary');  // ✅ Changed
 
 // ========== ADMIN ROUTES (Super Admin only) ==========
 
@@ -18,7 +18,7 @@ router.get('/alumni', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Add alumni
-router.post('/alumni', teamAuth, isSuperAdmin, upload.single('photo'), async (req, res) => {
+router.post('/alumni', teamAuth, isSuperAdmin, uploadAlumni.single('photo'), async (req, res) => {  // ✅ Changed
     try {
         const { name, batch, linkedin, description } = req.body;
         
@@ -55,7 +55,7 @@ router.post('/alumni', teamAuth, isSuperAdmin, upload.single('photo'), async (re
 });
 
 // Update alumni
-router.put('/alumni/:id', teamAuth, isSuperAdmin, upload.single('photo'), async (req, res) => {
+router.put('/alumni/:id', teamAuth, isSuperAdmin, uploadAlumni.single('photo'), async (req, res) => {  // ✅ Changed
     try {
         const { name, batch, linkedin, description, isActive } = req.body;
         const alumni = await Alumni.findById(req.params.id);
@@ -138,9 +138,8 @@ router.put('/alumni/reorder', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// ========== PUBLIC ROUTE (No auth required) ==========
+// ========== PUBLIC ROUTE ==========
 
-// Get all active alumni
 router.get('/public/alumni', async (req, res) => {
     try {
         const alumni = await Alumni.find({ isActive: true })
