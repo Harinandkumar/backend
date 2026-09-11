@@ -32,7 +32,6 @@ const permissionSchema = new mongoose.Schema({
         view: { type: Boolean, default: false },
         edit: { type: Boolean, default: false }
     },
-    // ✅ NEW: Certificate permissions
     certificates: {
         upload: { type: Boolean, default: false },
         delete: { type: Boolean, default: false }
@@ -44,12 +43,12 @@ const teamMemberSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true },
     position: { 
         type: String, 
-        enum: ['Core Member', 'Coordinator', 'Sub-Coordinator', 'Super Admin'],
+        enum: ['Core Member', 'Senior Coordinator', 'Coordinator', 'Sub-Coordinator', 'Super Admin'],
         default: 'Sub-Coordinator'
     },
     role: {
         type: String,
-        enum: ['super_admin', 'core_member', 'coordinator', 'sub_coordinator'],
+        enum: ['super_admin', 'senior_coordinator', 'core_member', 'coordinator', 'sub_coordinator'],
         required: true
     },
     profileImage: { type: String, default: '' },

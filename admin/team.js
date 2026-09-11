@@ -56,7 +56,19 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
             certificates: { upload: false, delete: false }
         };
         
-        if (role === 'core_member') {
+        // ✅ NEW: Senior Coordinator Permissions
+        if (role === 'senior_coordinator') {
+            defaultPermissions = {
+                events: { create: true, edit: true, delete: false },
+                notifications: { create: true, delete: true },
+                gallery: { upload: true, delete: false },
+                members: { view: true, delete: false },
+                categories: { create: true, edit: true, delete: false },
+                navItems: { create: true, edit: true, delete: false },
+                teamManagement: { view: true, edit: false },
+                certificates: { upload: true, delete: true }
+            };
+        } else if (role === 'core_member') {
             defaultPermissions = {
                 events: { create: true, edit: true, delete: true },
                 notifications: { create: true, delete: true },
@@ -93,10 +105,20 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
         
         const finalPermissions = permissions || defaultPermissions;
         
+        // ✅ Auto-set position based on role
+        let finalPosition = position;
+        if (!finalPosition) {
+            if (role === 'senior_coordinator') finalPosition = 'Senior Coordinator';
+            else if (role === 'core_member') finalPosition = 'Core Member';
+            else if (role === 'coordinator') finalPosition = 'Coordinator';
+            else if (role === 'sub_coordinator') finalPosition = 'Sub-Coordinator';
+            else finalPosition = 'Team Member';
+        }
+        
         const member = new TeamMember({
             name,
             email: email.toLowerCase(),
-            position: position || (role === 'core_member' ? 'Core Member' : role === 'coordinator' ? 'Coordinator' : 'Sub-Coordinator'),
+            position: finalPosition,
             role,
             phone: phone || '',
             profileImage: profileImage || '',
