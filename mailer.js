@@ -304,6 +304,90 @@ const sendWelcomeEmailToNewMember = async (email, name, role, permissions, added
         return false;
     }
 };
+// ========== CUSTOM DYNAMIC EMAIL ==========
+const sendCustomEmail = async (toEmail, subject, body, options = {}) => {
+    try {
+        const {
+            includePermissions = false,
+            permissions = {},
+            includeLoginInstructions = false,
+            includeLoginButton = false,
+            loginUrl = 'https://c3community.netlify.app/admin-login.html',
+            roleDisplay = '',
+            addedBy = ''
+        } = options;
+
+        let permissionsHtml = '';
+        if (includePermissions && permissions) {
+            const getIcon = (val) => val ? '✅' : '❌';
+            permissionsHtml = `
+                <div style="margin: 15px 0; padding: 15px; background: #f5f5f5; border-radius: 12px; color: #333;">
+                    <h4 style="color: #00f0ff; margin-bottom: 12px;">📋 Access Rights:</h4>
+                    <div style="margin-bottom: 8px;"><strong>📅 Events:</strong> ${getIcon(permissions.events?.create)} Create | ${getIcon(permissions.events?.edit)} Edit | ${getIcon(permissions.events?.delete)} Delete</div>
+                    <div style="margin-bottom: 8px;"><strong>🔔 Notifications:</strong> ${getIcon(permissions.notifications?.create)} Create | ${getIcon(permissions.notifications?.delete)} Delete</div>
+                    <div style="margin-bottom: 8px;"><strong>📸 Gallery:</strong> ${getIcon(permissions.gallery?.upload)} Upload | ${getIcon(permissions.gallery?.delete)} Delete</div>
+                    <div style="margin-bottom: 8px;"><strong>👥 Members:</strong> ${getIcon(permissions.members?.view)} View | ${getIcon(permissions.members?.delete)} Delete</div>
+                    <div style="margin-bottom: 8px;"><strong>🏷️ Categories:</strong> ${getIcon(permissions.categories?.create)} Create | ${getIcon(permissions.categories?.edit)} Edit | ${getIcon(permissions.categories?.delete)} Delete</div>
+                    <div style="margin-bottom: 8px;"><strong>📋 Nav Items:</strong> ${getIcon(permissions.navItems?.create)} Create | ${getIcon(permissions.navItems?.edit)} Edit | ${getIcon(permissions.navItems?.delete)} Delete</div>
+                </div>
+            `;
+        }
+
+        let loginInstructionsHtml = '';
+        if (includeLoginInstructions) {
+            loginInstructionsHtml = `
+                <div style="background: #f5f5f5; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <h3 style="color: #00f0ff; margin-top: 0;">🔐 How to Login</h3>
+                    <ol style="margin-left: 20px; line-height: 1.8;">
+                        <li>Go to: <strong>${loginUrl}</strong></li>
+                        <li>Click on <strong>"📧 OTP Login"</strong> tab</li>
+                        <li>Enter your email</li>
+                        <li>Click <strong>"Send OTP"</strong></li>
+                        <li>Enter OTP and login</li>
+                    </ol>
+                </div>
+            `;
+        }
+
+        let loginButtonHtml = '';
+        if (includeLoginButton) {
+            loginButtonHtml = `
+                <div style="text-align: center; padding: 15px;">
+                    <a href="${loginUrl}" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00f0ff, #ff2d75); color: white; text-decoration: none; border-radius: 50px; font-weight: 600;">🔐 Login Now</a>
+                </div>
+            `;
+        }
+
+        const html = `
+            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; border: 2px solid #00f0ff; border-radius: 20px; background: #fff;">
+                <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #00f0ff;">
+                    <h2 style="color: #00f0ff;">Creative Coding Community</h2>
+                    <p style="color: #666;">GEC Samastipur</p>
+                </div>
+                
+                <div style="padding: 20px 0; color: #333; line-height: 1.6;">
+                    ${body.replace(/\n/g, '<br>')}
+                </div>
+                
+                ${permissionsHtml}
+                ${loginInstructionsHtml}
+                ${loginButtonHtml}
+                
+                <div style="text-align: center; padding-top: 20px; font-size: 12px; color: #999; border-top: 1px solid #eee;">
+                    <p>Creative Coding Community - GEC Samastipur</p>
+                    <p>Support: creativecodingcommunity.cs@gmail.com</p>
+                </div>
+            </div>
+        `;
+
+        await sendBrevoEmail(toEmail, subject, html);
+        return true;
+    } catch (error) {
+        console.error('❌ sendCustomEmail failed:', error.message);
+        return false;
+    }
+};
+
 
 // ========== EXPORT ALL FUNCTIONS ==========
 module.exports = { 
@@ -312,5 +396,6 @@ module.exports = {
     sendWorkAssignedEmail,
     sendWorkCompletedEmail,
     sendNewMemberEmail,
-    sendWelcomeEmailToNewMember
+    sendWelcomeEmailToNewMember,
+    sendCustomEmail
 };

@@ -6,7 +6,7 @@ const Gallery = require('../schemas/gallery');
 const Category = require('../schemas/category');
 const NavItem = require('../schemas/navItem');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
-const { sendWelcomeEmailToNewMember } = require('../mailer');
+const { sendWelcomeEmailToNewMember, sendCustomEmail } = require('../mailer');
 const { logAdminAction } = require('../middleware/logActivity');
 
 router.get('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
@@ -34,7 +34,7 @@ router.get('/team-member/:id', teamAuth, isSuperAdmin, async (req, res) => {
 
 router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
     try {
-        const { name, email, position, role, phone, profileImage, permissions } = req.body;
+        const { name, email, position, role, phone, profileImage, permissions, customEmail } = req.body;
         
         if (!name || !email || !role) {
             return res.status(400).json({ message: 'Name, email and role are required' });
@@ -114,9 +114,39 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
             details: { name: member.name, email: member.email, role: member.role }
         });
         
+        // ========== SEND EMAIL (Custom or Default) ==========
         try {
-            await sendWelcomeEmailToNewMember(email, name, role, finalPermissions, req.teamMember.name);
-            console.log('Welcome email sent to:', email);
+            if (customEmail && customEmail.useCustom) {
+                // ✅ CUSTOM EMAIL
+                const subject = (customEmail.subject || '🎉 Welcome to C3 Admin Team, {name}!')
+                    .replace(/{name}/g, name)
+                    .replace(/{email}/g, email)
+                    .replace(/{role}/g, role)
+                    .replace(/{position}/g, position || '')
+                    .replace(/{addedBy}/g, req.teamMember.name);
+
+                const body = (customEmail.body || `Hi {name},\n\nWelcome to the C3 Admin Team!`)
+                    .replace(/{name}/g, name)
+                    .replace(/{email}/g, email)
+                    .replace(/{role}/g, role)
+                    .replace(/{position}/g, position || '')
+                    .replace(/{addedBy}/g, req.teamMember.name);
+
+                await sendCustomEmail(email, subject, body, {
+                    includePermissions: customEmail.includePermissions !== false,
+                    permissions: finalPermissions,
+                    includeLoginInstructions: customEmail.includeLoginInstructions !== false,
+                    includeLoginButton: customEmail.includeLoginButton !== false,
+                    roleDisplay: role,
+                    addedBy: req.teamMember.name
+                });
+                
+                console.log('✅ Custom welcome email sent to:', email);
+            } else {
+                // ✅ DEFAULT EMAIL (existing behavior)
+                await sendWelcomeEmailToNewMember(email, name, role, finalPermissions, req.teamMember.name);
+                console.log('✅ Default welcome email sent to:', email);
+            }
         } catch (emailError) {
             console.error('Member added but email failed:', emailError.message);
         }
