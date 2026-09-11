@@ -31,7 +31,7 @@ const loginHistoryRoutes = require('./admin/loginHistory');
 // ========== SCHEMAS FOR SEEDING ==========
 const TeamMember = require('./schemas/teamMember');
 const LoginHistory = require('./schemas/loginHistory');
-
+const winnersRoutes = require('./admin/winners');
 require('dotenv').config();
 
 // ========== CORS ==========
@@ -427,7 +427,8 @@ app.use('/api/team', teamManagementRoutes);
 app.use('/api/team/work', workRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/team/activity-logs', activityLogRoutes);
-
+app.use('/api/team', winnersRoutes);  // Admin routes
+app.use('/api', winnersRoutes);  
 // ========== TEAM PUBLIC ROUTES ==========
 app.use('/api/team', teamPublicRoutes); // Admin routes
 app.use('/api', teamPublicRoutes);      // Public route: /api/public/team

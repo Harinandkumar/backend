@@ -35,6 +35,12 @@ const permissionSchema = new mongoose.Schema({
     certificates: {
         upload: { type: Boolean, default: false },
         delete: { type: Boolean, default: false }
+    },
+    // ✅ NEW: Winners permissions
+    winners: {
+        create: { type: Boolean, default: false },
+        edit: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false }
     }
 });
 

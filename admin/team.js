@@ -53,10 +53,10 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
             categories: { create: false, edit: false, delete: false },
             navItems: { create: false, edit: false, delete: false },
             teamManagement: { view: false, edit: false },
-            certificates: { upload: false, delete: false }
+            certificates: { upload: false, delete: false },
+            winners: { create: false, edit: false, delete: false }
         };
         
-        // ✅ NEW: Senior Coordinator Permissions
         if (role === 'senior_coordinator') {
             defaultPermissions = {
                 events: { create: true, edit: true, delete: false },
@@ -66,7 +66,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 categories: { create: true, edit: true, delete: false },
                 navItems: { create: true, edit: true, delete: false },
                 teamManagement: { view: true, edit: false },
-                certificates: { upload: true, delete: true }
+                certificates: { upload: true, delete: true },
+                winners: { create: true, edit: true, delete: false }
             };
         } else if (role === 'core_member') {
             defaultPermissions = {
@@ -77,7 +78,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 categories: { create: true, edit: true, delete: true },
                 navItems: { create: true, edit: true, delete: true },
                 teamManagement: { view: false, edit: false },
-                certificates: { upload: true, delete: true }
+                certificates: { upload: true, delete: true },
+                winners: { create: true, edit: true, delete: true }
             };
         } else if (role === 'coordinator') {
             defaultPermissions = {
@@ -88,7 +90,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 categories: { create: false, edit: false, delete: false },
                 navItems: { create: false, edit: false, delete: false },
                 teamManagement: { view: false, edit: false },
-                certificates: { upload: true, delete: false }
+                certificates: { upload: true, delete: false },
+                winners: { create: false, edit: false, delete: false }
             };
         } else if (role === 'sub_coordinator') {
             defaultPermissions = {
@@ -99,13 +102,13 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 categories: { create: false, edit: false, delete: false },
                 navItems: { create: false, edit: false, delete: false },
                 teamManagement: { view: false, edit: false },
-                certificates: { upload: false, delete: false }
+                certificates: { upload: false, delete: false },
+                winners: { create: false, edit: false, delete: false }
             };
         }
         
         const finalPermissions = permissions || defaultPermissions;
         
-        // ✅ Auto-set position based on role
         let finalPosition = position;
         if (!finalPosition) {
             if (role === 'senior_coordinator') finalPosition = 'Senior Coordinator';
@@ -136,10 +139,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
             details: { name: member.name, email: member.email, role: member.role }
         });
         
-        // ========== SEND EMAIL (Custom or Default) ==========
         try {
             if (customEmail && customEmail.useCustom) {
-                // ✅ CUSTOM EMAIL
                 const subject = (customEmail.subject || '🎉 Welcome to C3 Admin Team, {name}!')
                     .replace(/{name}/g, name)
                     .replace(/{email}/g, email)
@@ -165,7 +166,6 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 
                 console.log('✅ Custom welcome email sent to:', email);
             } else {
-                // ✅ DEFAULT EMAIL (existing behavior)
                 await sendWelcomeEmailToNewMember(email, name, role, finalPermissions, req.teamMember.name);
                 console.log('✅ Default welcome email sent to:', email);
             }
