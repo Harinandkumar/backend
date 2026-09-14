@@ -1,4 +1,6 @@
 const express = require("express");
+const http = require('http');  // ✅ NEW: For Socket.io
+const { Server } = require('socket.io');  // ✅ NEW
 const app = express();
 const dbconnect = require("./dbconn");
 const { User, Event, Notification, Admin } = require("./schemas/schema");
@@ -15,12 +17,14 @@ const galleryRoutes = require('./admin/gallery');
 const categoryRoutes = require('./admin/category');
 const activityLogRoutes = require('./admin/activityLog');
 const teamPublicRoutes = require('./admin/teamPublic');
+const chatRoutes = require('./admin/chat');
 
 // ========== NEW TEAM MANAGEMENT ROUTES ==========
 const teamAuthRoutes = require('./admin/team-auth');
 const teamManagementRoutes = require('./admin/team');
 const workRoutes = require('./admin/work');
 const alumniRoutes = require('./admin/alumni');
+
 // ========== CERTIFICATE ROUTES ==========
 const certificateRoutes = require('./admin/certificate');
 const formBuilderRoutes = require('./admin/formBuilder');
@@ -32,6 +36,8 @@ const loginHistoryRoutes = require('./admin/loginHistory');
 const TeamMember = require('./schemas/teamMember');
 const LoginHistory = require('./schemas/loginHistory');
 const winnersRoutes = require('./admin/winners');
+const ChatMessage = require('./schemas/chatMessage');  // ✅ NEW
+
 require('dotenv').config();
 
 // ========== CORS ==========
@@ -49,6 +55,184 @@ app.use(express.urlencoded({ extended: true }));
 
 // ========== CONNECT DATABASE ==========
 dbconnect();
+
+// ========== ✅ SOCKET.IO SETUP ==========
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST'],
+        credentials: true
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000
+});
+
+// ✅ Make io accessible in routes
+app.set('io', io);
+
+// ✅ Online users tracking
+const onlineUsers = new Map();
+
+// ✅ Socket.io Connection Handler
+io.on('connection', (socket) => {
+    console.log('🔌 Socket connected:', socket.id);
+    
+    // ========== JOIN CHAT (User side) ==========
+    socket.on('join-chat', (data) => {
+        const { visitorId, userName, userEmail, userId } = data;
+        
+        if (!visitorId) {
+            console.error('❌ No visitorId provided');
+            return;
+        }
+        
+        socket.visitorId = visitorId;
+        socket.userName = userName || 'Guest';
+        
+        // Join visitor's room
+        socket.join(visitorId);
+        
+        // Track online user
+        onlineUsers.set(visitorId, {
+            visitorId,
+            userName: userName || 'Guest',
+            userEmail: userEmail || '',
+            userId: userId || null,
+            socketId: socket.id,
+            joinedAt: new Date()
+        });
+        
+        console.log(`👤 ${userName || 'Guest'} joined chat (${visitorId})`);
+        
+        // Notify all admins
+        io.emit('online-users', Array.from(onlineUsers.values()));
+    });
+    
+    // ========== JOIN ADMIN ROOM (Admin side) ==========
+    socket.on('join-admin', (adminData) => {
+        socket.join('admin-room');
+        socket.adminName = adminData.name || 'Admin';
+        console.log(`👑 Admin joined: ${socket.adminName}`);
+        
+        // Send current online users
+        socket.emit('online-users', Array.from(onlineUsers.values()));
+    });
+    
+    // ========== SEND MESSAGE (User/Bot/Admin) ==========
+    socket.on('send-message', async (data) => {
+        const { visitorId, message, sender, userName, userEmail, userId } = data;
+        
+        if (!visitorId || !message) return;
+        
+        try {
+            // Save to database
+            const chatMessage = new ChatMessage({
+                visitorId,
+                userId: userId || null,
+                userName: userName || 'Guest',
+                userEmail: userEmail || '',
+                message: message.trim(),
+                sender: sender || 'user',
+                isRead: sender === 'admin' || sender === 'bot',
+                ipAddress: data.ipAddress || '',
+                userAgent: data.userAgent || ''
+            });
+            
+            await chatMessage.save();
+            
+            if (sender === 'bot') {
+                // Bot message → send to user only
+                io.to(visitorId).emit('bot-message', {
+                    message: message.trim(),
+                    sender: 'bot',
+                    senderName: 'C3 Assistant',
+                    timestamp: chatMessage.createdAt
+                });
+            } else if (sender === 'user') {
+                // User message → notify admin
+                io.to('admin-room').emit('new-user-message', {
+                    visitorId,
+                    userName: userName || 'Guest',
+                    userEmail: userEmail || '',
+                    message: message.trim(),
+                    timestamp: chatMessage.createdAt
+                });
+            } else if (sender === 'admin') {
+                // Admin message → send to user
+                io.to(visitorId).emit('admin-message', {
+                    message: message.trim(),
+                    sender: 'admin',
+                    senderName: data.senderName || 'Admin',
+                    timestamp: chatMessage.createdAt
+                });
+            }
+            
+            console.log(`💬 ${sender} (${userName}): ${message.substring(0, 50)}`);
+        } catch (error) {
+            console.error('❌ Error saving message:', error);
+        }
+    });
+    
+    // ========== TYPING INDICATOR ==========
+    socket.on('typing', (data) => {
+        const { visitorId, userName, sender } = data;
+        
+        if (sender === 'admin') {
+            // Admin typing → notify user
+            io.to(visitorId).emit('admin-typing', {
+                senderName: userName || 'Admin'
+            });
+        } else {
+            // User typing → notify admin
+            io.to('admin-room').emit('user-typing', {
+                visitorId,
+                userName: userName || 'Guest'
+            });
+        }
+    });
+    
+    // ========== ADMIN REPLY VIA SOCKET ==========
+    socket.on('admin-reply', async (data) => {
+        const { visitorId, message, adminName } = data;
+        
+        if (!visitorId || !message) return;
+        
+        try {
+            const chatMessage = new ChatMessage({
+                visitorId,
+                message: message.trim(),
+                sender: 'admin',
+                senderName: adminName || 'Admin',
+                isRead: true
+            });
+            
+            await chatMessage.save();
+            
+            // Send to user
+            io.to(visitorId).emit('admin-message', {
+                message: message.trim(),
+                sender: 'admin',
+                senderName: adminName || 'Admin',
+                timestamp: chatMessage.createdAt
+            });
+            
+            console.log(`👑 Admin reply to ${visitorId}: ${message.substring(0, 50)}`);
+        } catch (error) {
+            console.error('❌ Error sending admin reply:', error);
+        }
+    });
+    
+    // ========== DISCONNECT ==========
+    socket.on('disconnect', () => {
+        if (socket.visitorId) {
+            onlineUsers.delete(socket.visitorId);
+            io.emit('online-users', Array.from(onlineUsers.values()));
+            console.log(`👋 ${socket.userName} disconnected`);
+        }
+        console.log('🔌 Socket disconnected:', socket.id);
+    });
+});
 
 // ========== SEED SUPER ADMIN ==========
 const seedSuperAdmin = async () => {
@@ -411,7 +595,6 @@ app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', formBuilderRoutes);
 
-
 // ========== CERTIFICATE ROUTES ==========
 app.use('/api/team/certificates', certificateRoutes);
 app.use('/api/certificates', certificateRoutes);
@@ -427,13 +610,16 @@ app.use('/api/team', teamManagementRoutes);
 app.use('/api/team/work', workRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/team/activity-logs', activityLogRoutes);
-app.use('/api/team', winnersRoutes);  // Admin routes
-app.use('/api', winnersRoutes);  
+app.use('/api/team', winnersRoutes);
+app.use('/api', winnersRoutes);
+app.use('/api/chat', chatRoutes);
+
 // ========== TEAM PUBLIC ROUTES ==========
-app.use('/api/team', teamPublicRoutes); // Admin routes
-app.use('/api', teamPublicRoutes);      // Public route: /api/public/team
-app.use('/api/team', alumniRoutes); // Admin routes
-app.use('/api', alumniRoutes);      // Public route: /api/public/alumni
+app.use('/api/team', teamPublicRoutes);
+app.use('/api', teamPublicRoutes);
+app.use('/api/team', alumniRoutes);
+app.use('/api', alumniRoutes);
+
 // ========== ADMIN VERIFY ENDPOINT ==========
 app.get('/admin/verify', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -449,11 +635,12 @@ app.get('/admin/verify', async (req, res) => {
     }
 });
 
-// ========== START SERVER ==========
+// ========== START SERVER (⚠️ Changed from app.listen to server.listen) ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📧 Email service: ${process.env.EMAIL_USER ? 'Configured' : 'Not configured'}`);
+    console.log(`🔌 Socket.io ready for real-time chat`);
 
     setTimeout(async () => {
         await seedSuperAdmin();
