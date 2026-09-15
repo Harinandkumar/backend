@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const CustomSection = require('../schemas/customSection');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
+const { uploadCustomSection } = require('../config/cloudinary');
 
 // ========== ADMIN ROUTES ==========
 
-// Get all sections (any admin can view)
+// Get all sections
 router.get('/custom-sections', teamAuth, async (req, res) => {
     try {
         const sections = await CustomSection.find()
@@ -163,6 +164,18 @@ router.delete('/custom-sections/:id', teamAuth, hasPermission('customSections', 
                     }
                 }
             }
+            // Card Grid — images inside cards
+            if (block.type === 'cardgrid' && Array.isArray(block.content?.cards)) {
+                for (const card of block.content.cards) {
+                    if (card.publicId) {
+                        try {
+                            await cloudinary.uploader.destroy(card.publicId);
+                        } catch (err) {
+                            console.error('Cloudinary delete error (cardgrid):', err.message);
+                        }
+                    }
+                }
+            }
         }
 
         await CustomSection.findByIdAndDelete(req.params.id);
@@ -190,6 +203,25 @@ router.put('/custom-sections-reorder/bulk', teamAuth, hasPermission('customSecti
     } catch (error) {
         console.error('Reorder error:', error);
         res.status(400).json({ message: error.message });
+    }
+});
+
+// ========== ✅ NEW: IMAGE UPLOAD (Custom Sections Only) ==========
+// Ye endpoint sirf Cloudinary mein upload karega, Gallery collection mein entry NAHI banayega
+router.post('/custom-sections/upload-image', teamAuth, hasPermission('customSections', 'create'), uploadCustomSection.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        res.json({
+            message: 'Image uploaded successfully',
+            url: req.file.path,
+            publicId: req.file.filename
+        });
+    } catch (error) {
+        console.error('Custom section image upload error:', error);
+        res.status(500).json({ message: error.message });
     }
 });
 
