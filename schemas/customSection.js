@@ -17,6 +17,7 @@ const blockSchema = new mongoose.Schema({
             'quote',
             'divider',
             'card',
+            'cardgrid', 
             'cta',
             'html',
             'spacer'
