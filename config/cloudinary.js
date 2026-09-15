@@ -115,6 +115,26 @@ const winnersStorage = new CloudinaryStorage({
     }
 });
 
+// ========== ✅ CUSTOM SECTION STORAGE (NEW) ==========
+const customSectionStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: async (req, file) => {
+        const title = req.body.title || 'section-image';
+        return {
+            folder: 'c3-custom-sections',
+            allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'gif'],
+            public_id: generateSeoFilename(title, 'custom-section'),
+            transformation: [
+                { width: 1400, height: 900, crop: 'limit', quality: 'auto' }
+            ]
+        };
+    }
+});
+
+const uploadCustomSection = multer({
+    storage: customSectionStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
 // ========== ✅ PDF STORAGE (Certificates) ==========
 const pdfStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
@@ -158,7 +178,10 @@ module.exports = {
     upload,          // Gallery
     uploadTeam,      // Team Public
     uploadAlumni,    // Alumni
-    uploadWinners,   // Winners
-    uploadPDF,       // Certificates
+    uploadWinners, 
+     uploadCustomSection,  // Winners
+    uploadPDF,
+    
+                 // Certificates
     generateSeoFilename
 };

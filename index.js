@@ -18,7 +18,7 @@ const categoryRoutes = require('./admin/category');
 const activityLogRoutes = require('./admin/activityLog');
 const teamPublicRoutes = require('./admin/teamPublic');
 const chatRoutes = require('./admin/chat');
-
+const customSectionRoutes = require('./admin/customSection');
 // ========== NEW TEAM MANAGEMENT ROUTES ==========
 const teamAuthRoutes = require('./admin/team-auth');
 const teamManagementRoutes = require('./admin/team');
@@ -594,7 +594,7 @@ app.use('/api', galleryRoutes);
 app.use('/admin', categoryRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', formBuilderRoutes);
-
+app.use('/api/team', customSectionRoutes); 
 // ========== CERTIFICATE ROUTES ==========
 app.use('/api/team/certificates', certificateRoutes);
 app.use('/api/certificates', certificateRoutes);

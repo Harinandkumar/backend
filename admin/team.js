@@ -54,7 +54,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
             navItems: { create: false, edit: false, delete: false },
             teamManagement: { view: false, edit: false },
             certificates: { upload: false, delete: false },
-            winners: { create: false, edit: false, delete: false }
+            winners: { create: false, edit: false, delete: false },
+            customSections: { create: false, edit: false, delete: false }
         };
         
         if (role === 'senior_coordinator') {
@@ -67,7 +68,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 navItems: { create: true, edit: true, delete: false },
                 teamManagement: { view: true, edit: false },
                 certificates: { upload: true, delete: true },
-                winners: { create: true, edit: true, delete: false }
+                winners: { create: true, edit: true, delete: false },
+                customSections: { create: true, edit: true, delete: false }
             };
         } else if (role === 'core_member') {
             defaultPermissions = {
@@ -79,7 +81,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 navItems: { create: true, edit: true, delete: true },
                 teamManagement: { view: false, edit: false },
                 certificates: { upload: true, delete: true },
-                winners: { create: true, edit: true, delete: true }
+                winners: { create: true, edit: true, delete: true },
+                customSections: { create: true, edit: true, delete: true }
             };
         } else if (role === 'coordinator') {
             defaultPermissions = {
@@ -91,7 +94,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 navItems: { create: false, edit: false, delete: false },
                 teamManagement: { view: false, edit: false },
                 certificates: { upload: true, delete: false },
-                winners: { create: false, edit: false, delete: false }
+                winners: { create: false, edit: false, delete: false },
+                customSections: { create: false, edit: false, delete: false }
             };
         } else if (role === 'sub_coordinator') {
             defaultPermissions = {
@@ -103,7 +107,8 @@ router.post('/team-members', teamAuth, isSuperAdmin, async (req, res) => {
                 navItems: { create: false, edit: false, delete: false },
                 teamManagement: { view: false, edit: false },
                 certificates: { upload: false, delete: false },
-                winners: { create: false, edit: false, delete: false }
+                winners: { create: false, edit: false, delete: false },
+                customSections: { create: false, edit: false, delete: false }
             };
         }
         

@@ -41,7 +41,13 @@ const permissionSchema = new mongoose.Schema({
         create: { type: Boolean, default: false },
         edit: { type: Boolean, default: false },
         delete: { type: Boolean, default: false }
-    }
+    },
+    // ✅ NEW: Custom Sections permission
+customSections: {
+    create: { type: Boolean, default: false },
+    edit: { type: Boolean, default: false },
+    delete: { type: Boolean, default: false }
+}
 });
 
 const teamMemberSchema = new mongoose.Schema({

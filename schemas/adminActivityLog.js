@@ -1,16 +1,16 @@
 const mongoose = require('mongoose');
 
 const adminActivityLogSchema = new mongoose.Schema({
-    adminId: { 
-        type: mongoose.Schema.Types.ObjectId, 
+    adminId: {
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'TeamMember',
-        required: true 
+        required: true
     },
     adminName: { type: String, required: true },
     adminEmail: { type: String, required: true },
     adminRole: { type: String, required: true },
-    action: { 
-        type: String, 
+    action: {
+        type: String,
         enum: [
             // Events
             'event_created', 'event_updated', 'event_deleted', 'event_toggle_status',
@@ -30,23 +30,27 @@ const adminActivityLogSchema = new mongoose.Schema({
             'certificate_uploaded', 'certificate_deleted',
             // Work Assignment
             'work_assigned', 'work_updated', 'work_status_changed', 'work_deleted',
+            // ✅ NEW: Custom Sections
+            'custom_section_created', 'custom_section_updated',
+            'custom_section_deleted', 'custom_section_published',
+            'custom_section_unpublished', 'custom_section_blocks_updated',
             // Login/Logout
             'admin_login', 'admin_logout'
         ],
-        required: true 
+        required: true
     },
-    actionDetails: { 
+    actionDetails: {
         type: mongoose.Schema.Types.Mixed,
-        default: {} 
+        default: {}
     },
-    targetId: { 
+    targetId: {
         type: mongoose.Schema.Types.ObjectId,
         refPath: 'targetModel',
         default: null
     },
     targetModel: {
         type: String,
-        enum: ['Event', 'Notification', 'Gallery', 'Category', 'NavItem', 'User', 'TeamMember', 'Certificate', 'WorkAssignment'],
+        enum: ['Event', 'Notification', 'Gallery', 'Category', 'NavItem', 'User', 'TeamMember', 'Certificate', 'WorkAssignment', 'CustomSection'],
         default: null
     },
     targetName: { type: String, default: null },
