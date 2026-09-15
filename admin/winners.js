@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Winners = require('../schemas/winners');
 const { teamAuth, isSuperAdmin, hasPermission } = require('../middleware/teamAuth');
-const { uploadWinners } = require('../config/cloudinary');  // ✅ Changed
+const { uploadWinners } = require('../config/cloudinary');
 
 // ========== ADMIN ROUTES ==========
 
@@ -99,7 +99,7 @@ router.delete('/winners/:id', teamAuth, hasPermission('winners', 'delete'), asyn
 });
 
 // Add winner
-router.post('/winners/:id/add-winner', teamAuth, hasPermission('winners', 'create'), uploadWinners.single('photo'), async (req, res) => {  // ✅ Changed
+router.post('/winners/:id/add-winner', teamAuth, hasPermission('winners', 'create'), uploadWinners.single('photo'), async (req, res) => {
     try {
         const { name, rollno, eventName, rank } = req.body;
 
@@ -131,6 +131,52 @@ router.post('/winners/:id/add-winner', teamAuth, hasPermission('winners', 'creat
         res.status(201).json({ message: 'Winner added successfully', section });
     } catch (error) {
         console.error('Error adding winner:', error);
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// ========== ✅ NEW: Edit Winner ==========
+router.put('/winners/:id/edit-winner/:winnerId', teamAuth, hasPermission('winners', 'edit'), uploadWinners.single('photo'), async (req, res) => {
+    try {
+        const { name, rollno, eventName, rank } = req.body;
+        const { id, winnerId } = req.params;
+
+        if (!name || !rollno || !eventName) {
+            return res.status(400).json({ message: 'Name, rollno and eventName are required' });
+        }
+
+        const section = await Winners.findById(id);
+        if (!section) return res.status(404).json({ message: 'Section not found' });
+
+        const winner = section.winners.id(winnerId);
+        if (!winner) return res.status(404).json({ message: 'Winner not found' });
+
+        // Update text fields
+        winner.name = name.trim();
+        winner.rollno = rollno.trim();
+        winner.eventName = eventName.trim();
+        winner.rank = rank || winner.rank || '1st';
+
+        // ✅ Photo optional — agar naya photo aaya toh purani delete karke nayi lagao
+        if (req.file) {
+            const { cloudinary } = require('../config/cloudinary');
+            try {
+                if (winner.publicId) {
+                    await cloudinary.uploader.destroy(winner.publicId);
+                }
+            } catch (cloudErr) {
+                console.error('Cloudinary delete error (old winner photo):', cloudErr);
+            }
+            winner.photo = req.file.path;
+            winner.publicId = req.file.filename;
+        }
+
+        section.updatedAt = new Date();
+        await section.save();
+
+        res.json({ message: 'Winner updated successfully', section });
+    } catch (error) {
+        console.error('Error editing winner:', error);
         res.status(400).json({ message: error.message });
     }
 });
