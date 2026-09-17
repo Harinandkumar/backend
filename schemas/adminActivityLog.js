@@ -31,11 +31,14 @@ const adminActivityLogSchema = new mongoose.Schema({
             // Work Assignment
             'work_assigned', 'work_updated', 'work_status_changed', 'work_deleted',
             // ✅ NEW: Custom Sections
-            'custom_section_created', 'custom_section_updated',
-            'custom_section_deleted', 'custom_section_published',
-            'custom_section_unpublished', 'custom_section_blocks_updated',
-            // Login/Logout
-            'admin_login', 'admin_logout'
+'custom_section_created', 'custom_section_updated',
+'custom_section_deleted', 'custom_section_published',
+'custom_section_unpublished', 'custom_section_blocks_updated',
+// ✅ NEW: Reels
+'reel_created', 'reel_updated', 'reel_deleted',
+'reel_published', 'reel_unpublished', 'reel_reordered',
+// Login/Logout
+'admin_login', 'admin_logout'
         ],
         required: true
     },
@@ -50,7 +53,7 @@ const adminActivityLogSchema = new mongoose.Schema({
     },
     targetModel: {
         type: String,
-        enum: ['Event', 'Notification', 'Gallery', 'Category', 'NavItem', 'User', 'TeamMember', 'Certificate', 'WorkAssignment', 'CustomSection'],
+        enum: ['Event', 'Notification', 'Gallery', 'Category', 'NavItem', 'User', 'TeamMember', 'Certificate', 'WorkAssignment', 'CustomSection','Reel'],
         default: null
     },
     targetName: { type: String, default: null },

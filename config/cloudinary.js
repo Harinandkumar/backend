@@ -145,7 +145,38 @@ const pdfStorage = new CloudinaryStorage({
         format: 'pdf'
     }
 });
+// ========== ✅ REEL VIDEO STORAGE ==========
+const reelStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: async (req, file) => {
+        const title = req.body.title || 'reel-video';
+        return {
+            folder: 'c3-reels',
+            resource_type: 'video',
+            allowed_formats: ['mp4', 'webm', 'mov', 'avi', 'mkv'],
+            public_id: generateSeoFilename(title, 'reel-video'),
+            transformation: [
+                { quality: 'auto', fetch_format: 'auto' }
+            ]
+        };
+    }
+});
 
+// ========== ✅ REEL THUMBNAIL STORAGE ==========
+const reelThumbnailStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: async (req, file) => {
+        const title = req.body.title || 'reel-thumbnail';
+        return {
+            folder: 'c3-reels-thumbnails',
+            allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
+            public_id: generateSeoFilename(title, 'reel-thumb'),
+            transformation: [
+                { width: 600, height: 1067, crop: 'limit', quality: 'auto' }  // 9:16 vertical
+            ]
+        };
+    }
+});
 // ========== MULTER INSTANCES ==========
 const upload = multer({ 
     storage: imageStorage,
@@ -171,7 +202,16 @@ const uploadPDF = multer({
     storage: pdfStorage,
     limits: { fileSize: 5 * 1024 * 1024 }
 });
+// ========== REEL MULTER INSTANCES ==========
+const uploadReelVideo = multer({
+    storage: reelStorage,
+    limits: { fileSize: 50 * 1024 * 1024 }   // 50MB (15-sec video ke liye kaafi)
+});
 
+const uploadReelThumbnail = multer({
+    storage: reelThumbnailStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 // ========== EXPORTS ==========
 module.exports = { 
     cloudinary, 
@@ -181,6 +221,8 @@ module.exports = {
     uploadWinners, 
      uploadCustomSection,  // Winners
     uploadPDF,
+     uploadReelVideo,    // ✅ NEW: Reels Video
+    uploadReelThumbnail, // ✅ NEW: Reels Thumbnail
     
                  // Certificates
     generateSeoFilename

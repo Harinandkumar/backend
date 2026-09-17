@@ -47,7 +47,14 @@ customSections: {
     create: { type: Boolean, default: false },
     edit: { type: Boolean, default: false },
     delete: { type: Boolean, default: false }
+},
+// ✅ NEW: Reels permission
+reels: {
+    create: { type: Boolean, default: false },
+    edit: { type: Boolean, default: false },
+    delete: { type: Boolean, default: false }
 }
+
 });
 
 const teamMemberSchema = new mongoose.Schema({
