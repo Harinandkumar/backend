@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const Alumni = require('../schemas/alumni');
-const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
-const { uploadAlumni } = require('../config/cloudinary');  // ✅ Changed
+const { teamAuth, isSuperAdmin, isSuperAdminOrSuperAdmin2 } = require('../middleware/teamAuth');
+const { uploadAlumni } = require('../config/cloudinary');
 
-// ========== ADMIN ROUTES (Super Admin only) ==========
+// ========== ADMIN ROUTES ==========
 
 // Get all alumni
-router.get('/alumni', teamAuth, isSuperAdmin, async (req, res) => {
+router.get('/alumni', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const alumni = await Alumni.find().sort({ order: 1, createdAt: -1 });
         res.json(alumni);
@@ -18,7 +18,7 @@ router.get('/alumni', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Add alumni
-router.post('/alumni', teamAuth, isSuperAdmin, uploadAlumni.single('photo'), async (req, res) => {  // ✅ Changed
+router.post('/alumni', teamAuth, isSuperAdminOrSuperAdmin2, uploadAlumni.single('photo'), async (req, res) => {
     try {
         const { name, batch, linkedin, description } = req.body;
         
@@ -55,7 +55,7 @@ router.post('/alumni', teamAuth, isSuperAdmin, uploadAlumni.single('photo'), asy
 });
 
 // Update alumni
-router.put('/alumni/:id', teamAuth, isSuperAdmin, uploadAlumni.single('photo'), async (req, res) => {  // ✅ Changed
+router.put('/alumni/:id', teamAuth, isSuperAdminOrSuperAdmin2, uploadAlumni.single('photo'), async (req, res) => {
     try {
         const { name, batch, linkedin, description, isActive } = req.body;
         const alumni = await Alumni.findById(req.params.id);
@@ -95,7 +95,7 @@ router.put('/alumni/:id', teamAuth, isSuperAdmin, uploadAlumni.single('photo'), 
 });
 
 // Delete alumni
-router.delete('/alumni/:id', teamAuth, isSuperAdmin, async (req, res) => {
+router.delete('/alumni/:id', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const alumni = await Alumni.findById(req.params.id);
         if (!alumni) {
@@ -119,7 +119,7 @@ router.delete('/alumni/:id', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Reorder alumni
-router.put('/alumni/reorder', teamAuth, isSuperAdmin, async (req, res) => {
+router.put('/alumni/reorder', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const { items } = req.body;
         

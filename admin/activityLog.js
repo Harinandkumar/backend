@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const AdminActivityLog = require('../schemas/adminActivityLog');
-const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
+const { teamAuth, isSuperAdmin, isSuperAdminOrSuperAdmin2 } = require('../middleware/teamAuth');
 
 // ========== SUPER ADMIN ROUTES ==========
-// Get all admin activities
-router.get('/all', teamAuth, isSuperAdmin, async (req, res) => {
+// Get all admin activities (Super Admin + Super Admin 2)
+router.get('/all', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const { adminId, action, startDate, endDate, limit = 100, page = 1 } = req.query;
         let query = {};
@@ -69,8 +69,8 @@ router.get('/my', teamAuth, async (req, res) => {
     }
 });
 
-// Get activity stats (Super Admin only)
-router.get('/stats', teamAuth, isSuperAdmin, async (req, res) => {
+// Get activity stats (Super Admin + Super Admin 2)
+router.get('/stats', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const { days = 7 } = req.query;
         
@@ -120,8 +120,8 @@ router.get('/stats', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Cleanup old logs (Super Admin only)
-router.delete('/cleanup', teamAuth, isSuperAdmin, async (req, res) => {
+// Cleanup old logs (Super Admin + Super Admin 2)
+router.delete('/cleanup', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const { days = 90 } = req.query;
         const cutoffDate = new Date();

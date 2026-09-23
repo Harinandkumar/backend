@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const TeamPublic = require('../schemas/teamPublic');
-const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
-const { uploadTeam } = require('../config/cloudinary');  // ✅ Changed
+const { teamAuth, isSuperAdmin, isSuperAdminOrSuperAdmin2 } = require('../middleware/teamAuth');
+const { uploadTeam } = require('../config/cloudinary');
 
-// ========== ADMIN ROUTES (Super Admin only) ==========
+// ========== ADMIN ROUTES (Super Admin + Super Admin 2) ==========
 
 // Get all team members
-router.get('/team-public', teamAuth, isSuperAdmin, async (req, res) => {
+router.get('/team-public', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const members = await TeamPublic.find().sort({ order: 1, createdAt: -1 });
         res.json(members);
@@ -18,7 +18,7 @@ router.get('/team-public', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Add team member
-router.post('/team-public', teamAuth, isSuperAdmin, uploadTeam.single('photo'), async (req, res) => {  // ✅ Changed
+router.post('/team-public', teamAuth, isSuperAdminOrSuperAdmin2, uploadTeam.single('photo'), async (req, res) => {
     try {
         const { name, position, batch, linkedin } = req.body;
         
@@ -55,7 +55,7 @@ router.post('/team-public', teamAuth, isSuperAdmin, uploadTeam.single('photo'), 
 });
 
 // Update team member
-router.put('/team-public/:id', teamAuth, isSuperAdmin, uploadTeam.single('photo'), async (req, res) => {  // ✅ Changed
+router.put('/team-public/:id', teamAuth, isSuperAdminOrSuperAdmin2, uploadTeam.single('photo'), async (req, res) => {
     try {
         const { name, position, batch, linkedin, isActive } = req.body;
         const member = await TeamPublic.findById(req.params.id);
@@ -95,7 +95,7 @@ router.put('/team-public/:id', teamAuth, isSuperAdmin, uploadTeam.single('photo'
 });
 
 // Delete team member
-router.delete('/team-public/:id', teamAuth, isSuperAdmin, async (req, res) => {
+router.delete('/team-public/:id', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const member = await TeamPublic.findById(req.params.id);
         if (!member) {
@@ -119,7 +119,7 @@ router.delete('/team-public/:id', teamAuth, isSuperAdmin, async (req, res) => {
 });
 
 // Reorder team members
-router.put('/team-public/reorder', teamAuth, isSuperAdmin, async (req, res) => {
+router.put('/team-public/reorder', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const { items } = req.body;
         

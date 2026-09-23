@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const LoginHistory = require('../schemas/loginHistory');
-const { teamAuth, isSuperAdmin } = require('../middleware/teamAuth');
+const { teamAuth, isSuperAdmin, isSuperAdminOrSuperAdmin2 } = require('../middleware/teamAuth');   // ✅ Added
 const { userAuth } = require('../middleware/auth');
 
 // ========== USER ROUTES (Normal User ke liye) ==========
@@ -43,7 +43,8 @@ router.get('/team/my', teamAuth, async (req, res) => {
 });
 
 // ========== ADMIN ROUTES (Super Admin only) ==========
-router.get('/all', teamAuth, isSuperAdmin, async (req, res) => {
+// ✅ Super Admin + Super Admin 2 dono access kar sakte hain
+router.get('/all', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {
     try {
         const { email, startDate, endDate, limit = 100 } = req.query;
         let query = {};
@@ -81,8 +82,8 @@ router.get('/all', teamAuth, isSuperAdmin, async (req, res) => {
     }
 });
 
-// Get login stats (Super Admin only)
-router.get('/stats', teamAuth, isSuperAdmin, async (req, res) => {
+// Get login stats (Super Admin + Super Admin 2)
+router.get('/stats', teamAuth, isSuperAdminOrSuperAdmin2, async (req, res) => {   // ✅ Updated
     try {
         const last7Days = [];
         for (let i = 6; i >= 0; i--) {
