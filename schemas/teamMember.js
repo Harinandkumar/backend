@@ -36,25 +36,24 @@ const permissionSchema = new mongoose.Schema({
         upload: { type: Boolean, default: false },
         delete: { type: Boolean, default: false }
     },
-    // ✅ NEW: Winners permissions
+    // ✅ Winners permissions
     winners: {
         create: { type: Boolean, default: false },
         edit: { type: Boolean, default: false },
         delete: { type: Boolean, default: false }
     },
-    // ✅ NEW: Custom Sections permission
-customSections: {
-    create: { type: Boolean, default: false },
-    edit: { type: Boolean, default: false },
-    delete: { type: Boolean, default: false }
-},
-// ✅ NEW: Reels permission
-reels: {
-    create: { type: Boolean, default: false },
-    edit: { type: Boolean, default: false },
-    delete: { type: Boolean, default: false }
-}
-
+    // ✅ Custom Sections permission
+    customSections: {
+        create: { type: Boolean, default: false },
+        edit: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false }
+    },
+    // ✅ Reels permission
+    reels: {
+        create: { type: Boolean, default: false },
+        edit: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false }
+    }
 });
 
 const teamMemberSchema = new mongoose.Schema({
@@ -62,12 +61,12 @@ const teamMemberSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true },
     position: { 
         type: String, 
-        enum: ['Core Member', 'Senior Coordinator', 'Coordinator', 'Sub-Coordinator', 'Super Admin'],
+        enum: ['Core Member', 'Senior Coordinator', 'Coordinator', 'Sub-Coordinator', 'Super Admin', 'Super Admin 2'],   // ✅ super_admin_2 added
         default: 'Sub-Coordinator'
     },
     role: {
         type: String,
-        enum: ['super_admin', 'senior_coordinator', 'core_member', 'coordinator', 'sub_coordinator'],
+        enum: ['super_admin', 'super_admin_2', 'senior_coordinator', 'core_member', 'coordinator', 'sub_coordinator'],   // ✅ super_admin_2 added
         required: true
     },
     profileImage: { type: String, default: '' },

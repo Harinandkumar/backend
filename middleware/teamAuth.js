@@ -28,9 +28,17 @@ const teamAuth = async (req, res, next) => {
     }
 };
 
-// Check if user is Super Admin
+// Check if user is Super Admin (only super_admin — strict)
 const isSuperAdmin = (req, res, next) => {
     if (req.teamMember.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Access denied. Super Admin only.' });
+    }
+    next();
+};
+
+// ✅ NEW: Check if user is Super Admin OR Super Admin 2 (for general admin access)
+const isSuperAdminOrSuperAdmin2 = (req, res, next) => {
+    if (req.teamMember.role !== 'super_admin' && req.teamMember.role !== 'super_admin_2') {
         return res.status(403).json({ message: 'Access denied. Super Admin only.' });
     }
     next();
@@ -41,12 +49,22 @@ const hasPermission = (module, action) => {
     return (req, res, next) => {
         const permissions = req.teamMember.permissions;
         
-        // Super admin has all permissions
+        // ✅ Super Admin — has ALL permissions
         if (req.teamMember.role === 'super_admin') {
             return next();
         }
         
-        // Check permission
+        // ✅ Super Admin 2 — has ALL permissions EXCEPT teamManagement
+        if (req.teamMember.role === 'super_admin_2') {
+            if (module === 'teamManagement') {
+                return res.status(403).json({ 
+                    message: 'Access denied. Super Admin 2 cannot manage team.' 
+                });
+            }
+            return next();
+        }
+        
+        // Check permission for other roles
         if (permissions[module] && permissions[module][action] === true) {
             return next();
         }
@@ -57,4 +75,9 @@ const hasPermission = (module, action) => {
     };
 };
 
-module.exports = { teamAuth, isSuperAdmin, hasPermission };
+module.exports = { 
+    teamAuth, 
+    isSuperAdmin, 
+    isSuperAdminOrSuperAdmin2,   // ✅ NEW
+    hasPermission 
+};
